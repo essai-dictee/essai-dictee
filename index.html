@@ -1,0 +1,326 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Essai dictée des notes</title>
+<style>
+:root{color-scheme:light dark;--bg:light-dark(#f6f6f3,#16181b);--carte:light-dark(#fff,#202327);--ink:light-dark(#1b1d20,#ecedee);--doux:light-dark(#62666d,#9aa0a8);--trait:light-dark(#dcdcd6,#33373d);--ok:light-dark(#1d7a45,#4cc282);--non:light-dark(#b3261e,#ff8a80);--accent:light-dark(#1f4fd1,#7aa2ff)}
+*{box-sizing:border-box;min-width:0}
+body{margin:0;background:var(--bg);color:var(--ink);font:17px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+main{max-width:640px;margin:0 auto;padding:16px 16px 48px}
+h1{font-size:26px;line-height:1.15;margin:4px 0 4px}
+h2{font-size:18px;margin:28px 0 8px}
+.petit{font-size:14px;color:var(--doux)}
+.carte{background:var(--carte);border:1px solid var(--trait);border-radius:14px;padding:14px 16px;margin-top:12px}
+button{font:inherit;min-height:44px;padding:8px 16px;border-radius:10px;border:1px solid var(--trait);background:var(--carte);color:var(--ink);cursor:pointer}
+button:focus-visible,input:focus-visible,textarea:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+button:disabled{opacity:.45;cursor:default}
+#go{width:100%;min-height:64px;font-size:20px;font-weight:600;background:var(--accent);color:#fff;border:0;margin-top:14px}
+#go.stop{background:var(--non)}
+#etat{font-weight:600}
+#entendu{min-height:1.5em;color:var(--doux);font-style:italic}
+#derniere{font-size:40px;font-weight:700;line-height:1.1;min-height:1.1em;margin-top:6px}
+#bandeau{display:none;background:var(--accent);color:#fff;border-radius:10px;padding:12px 14px;margin-top:12px;font-weight:600}
+ol{list-style:none;margin:0;padding:0}
+#journal li{border-top:1px solid var(--trait);padding:8px 0}
+#journal li:first-child{border-top:0}
+.brut{font-size:14px;color:var(--doux)}
+.ok{color:var(--ok);font-weight:600}.non{color:var(--non);font-weight:600}
+.lat{font-size:13px;color:var(--doux);white-space:nowrap}
+table{width:100%;border-collapse:collapse;font-size:16px}
+td{padding:6px 4px;border-top:1px solid var(--trait);vertical-align:middle}
+td.n{text-align:right;font-weight:700;white-space:nowrap;width:4em}
+td button{min-height:36px;padding:4px 10px;font-size:14px}
+.alias{font-size:13px;color:var(--doux)}
+label{display:flex;gap:10px;align-items:center;margin:8px 0}
+input[type=number]{width:5em;font:inherit;padding:6px;border-radius:8px;border:1px solid var(--trait);background:var(--carte);color:var(--ink)}
+textarea{width:100%;min-height:9em;font:16px/1.4 inherit;padding:8px;border-radius:8px;border:1px solid var(--trait);background:var(--carte);color:var(--ink)}
+.ligne{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+</style>
+</head>
+<body>
+<main>
+<h1>Essai de dictée des notes</h1>
+<p class="petit">Test seulement : rien n'est envoyé, la reconnaissance se fait dans le téléphone. Les notes s'effacent en fermant la page. Prénoms inventés uniquement.</p>
+
+<div class="carte">
+  <div>État : <span id="etat">chargement du modèle…</span></div>
+  <div class="petit" id="info">Première fois : environ 42 Mo à télécharger (en wifi). Ensuite, le modèle reste dans le téléphone.</div>
+  <button id="go" disabled>Démarrer l'écoute</button>
+  <div id="bandeau"></div>
+</div>
+
+<div class="carte">
+  <div class="petit">J'entends :</div>
+  <div id="entendu"></div>
+  <div class="petit" style="margin-top:10px">Dernière note :</div>
+  <div id="derniere"></div>
+</div>
+
+<h2>Comment dicter</h2>
+<p class="petit">« Maxime douze » · « Simon quatorze virgule cinq » · « David dix et demi » · « Léo absent » · « Emma non rendu » · « Jules non noté » · « annule » · « pause » puis « reprends ».<br>Naël et Évan sont inconnus du modèle : démarre l'écoute, puis touche « Apprendre » à côté de leur prénom et dis-le une fois.</p>
+
+<h2>Journal</h2>
+<div class="carte"><ol id="journal"><li class="petit">Rien pour l'instant.</li></ol></div>
+
+<h2>Élèves</h2>
+<div class="carte"><table><tbody id="eleves"></tbody></table></div>
+
+<h2>Réglages</h2>
+<div class="carte">
+  <label>Barème <input type="number" id="bareme" min="1" max="100" value="20"></label>
+  <label><input type="checkbox" id="voix"> Répéter la note à voix haute</label>
+  <div class="petit" style="margin-top:12px">Prénoms (un par ligne, inventés) :</div>
+  <textarea id="liste"></textarea>
+  <div class="ligne" style="margin-top:8px"><button id="enreg">Mettre à jour la liste</button><span class="petit" id="msgListe"></span></div>
+</div>
+
+<p class="petit" style="margin-top:28px">Reconnaissance : Vosk (vosk-browser 0.0.8), modèle vosk-model-small-fr-0.22 d'Alpha Cephei, licence Apache 2.0.</p>
+</main>
+
+<script src="https://cdn.jsdelivr.net/npm/vosk-browser@0.0.8/dist/vosk.js"></script>
+<script src="parse.js"></script>
+<script>
+{
+const $ = id => document.getElementById(id);
+// Adresse complète : le moteur tourne dans un « worker » qui ne connaît pas le dossier de la page.
+const MODELE = new URL("model/vosk-model-small-fr-0.22.tar.gz", location.href).href;
+const DEFAUT = ["Maxime","Damien","Alfred","Béatrice","Simon","Roger","David","Léo","Emma","Jules","Naël","Évan"];
+
+function lire(cle, def) { try { const v = localStorage.getItem(cle); return v ? JSON.parse(v) : def; } catch (e) { return def; } }
+function ecrire(cle, v) { try { localStorage.setItem(cle, JSON.stringify(v)); } catch (e) {} }
+
+let eleves = lire("eleves", DEFAUT.map(nom => ({ nom, alias: [] })));
+let bareme = lire("bareme", 20);
+let voix = lire("voix", false);
+const notes = {};        // nom -> valeur (en mémoire seulement)
+const historique = [];   // pour « annule »
+let model = null, rec = null, recLibre = null;
+let ctx = null, flux = null, noeud = null, verrou = null;
+let mode = "arret";      // arret | ecoute | pause | apprendre
+let muet = false, apprendreNom = null, minuterie = null;
+let dernierPartiel = "", tChangement = 0;
+
+function setEtat(t) { $("etat").textContent = t; }
+function esc(s) { return String(s).replace(/[&<>"']/g, c => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[c])); }
+
+function afficherEleves() {
+  $("eleves").innerHTML = eleves.map((e, i) => `<tr>
+    <td>${esc(e.nom)}${e.alias.length ? `<div class="alias">entendu comme : ${e.alias.map(a => "« " + esc(a) + " »").join(", ")}</div>` : ""}</td>
+    <td class="n">${e.nom in notes ? esc(Dictee.formater(notes[e.nom])) : "—"}</td>
+    <td style="text-align:right;white-space:nowrap"><button data-app="${i}">Apprendre</button>${e.alias.length ? ` <button data-oubli="${i}" aria-label="Oublier">✕</button>` : ""}</td>
+  </tr>`).join("");
+}
+
+function journal(brut, html, lat) {
+  const ol = $("journal");
+  if (ol.firstElementChild && ol.firstElementChild.classList.contains("petit")) ol.innerHTML = "";
+  const li = document.createElement("li");
+  const h = new Date().toLocaleTimeString("fr-FR");
+  li.innerHTML = `<div>${html} ${lat != null ? `<span class="lat">· ${(lat / 1000).toFixed(1).replace(".", ",")} s</span>` : ""}</div>
+    <div class="brut">${h} · entendu : « ${esc(brut)} »</div>`;
+  ol.prepend(li);
+}
+
+function parler(texte) {
+  if (!voix || !("speechSynthesis" in window)) return;
+  muet = true;
+  const u = new SpeechSynthesisUtterance(texte);
+  u.lang = "fr-FR";
+  u.onend = u.onerror = () => setTimeout(() => { muet = false; }, 250);
+  speechSynthesis.cancel();
+  speechSynthesis.speak(u);
+}
+
+function pourVoix(v) {
+  if (v === "A") return "absent";
+  if (v === "R") return "non rendu";
+  if (v === "N") return "non noté";
+  return String(v).replace(".", " virgule ");
+}
+
+function traiter(texte, lat) {
+  const actions = Dictee.analyser(texte, eleves, bareme);
+  for (const a of actions) {
+    if (mode === "pause" && !(a.type === "commande" && a.nom === "reprends")) continue;
+    if (a.type === "commande") {
+      if (a.nom === "pause") { mode = "pause"; setEtat("en pause (dis « reprends »)"); journal(texte, `<span class="ok">Pause</span>`, lat); parler("pause"); }
+      else if (a.nom === "reprends") { mode = "ecoute"; setEtat("écoute"); journal(texte, `<span class="ok">Reprise</span>`, lat); parler("je reprends"); }
+      else if (a.nom === "annule") {
+        const d = historique.pop();
+        if (d) {
+          if (d.avant === undefined) delete notes[d.nom]; else notes[d.nom] = d.avant;
+          journal(texte, `<span class="ok">Annulé : ${esc(d.nom)}</span>`, lat); parler("annulé");
+          $("derniere").textContent = "";
+        } else journal(texte, `<span class="non">Rien à annuler</span>`, lat);
+      }
+    } else if (a.type === "note") {
+      const avant = notes[a.eleve];
+      historique.push({ nom: a.eleve, avant });
+      notes[a.eleve] = a.valeur;
+      const f = Dictee.formater(a.valeur);
+      $("derniere").textContent = a.eleve + " : " + f;
+      journal(texte, `<span class="ok">${esc(a.eleve)} : ${esc(f)}</span>${avant !== undefined ? ` <span class="petit">(remplace ${esc(Dictee.formater(avant))})</span>` : ""}`, lat);
+      parler(a.eleve + ", " + pourVoix(a.valeur));
+    } else {
+      journal(texte, `<span class="non">Ignoré : ${esc(a.raison)}</span>`, lat);
+    }
+  }
+  afficherEleves();
+}
+
+function grammaire() { return JSON.stringify([...Dictee.vocabulaire(eleves), "[unk]"]); }
+
+function creerRec() {
+  const ancien = rec;
+  rec = null;
+  if (ancien) { try { ancien.remove(); } catch (e) {} }
+  const r = new model.KaldiRecognizer(ctx.sampleRate, grammaire());
+  r.on("partialresult", m => {
+    const p = m.result.partial || "";
+    if (p !== dernierPartiel) { dernierPartiel = p; tChangement = performance.now(); }
+    if (mode !== "apprendre") $("entendu").textContent = p;
+  });
+  r.on("result", m => {
+    const t = (m.result.text || "").trim();
+    const lat = tChangement ? performance.now() - tChangement : null;
+    dernierPartiel = ""; tChangement = 0;
+    if (!t || mode === "apprendre") return;
+    $("entendu").textContent = "";
+    traiter(t, lat);
+  });
+  rec = r;
+}
+
+function creerRecLibre() {
+  recLibre = new model.KaldiRecognizer(ctx.sampleRate);
+  recLibre.on("partialresult", m => { if (mode === "apprendre") $("entendu").textContent = m.result.partial || ""; });
+  recLibre.on("result", m => {
+    if (mode !== "apprendre") return;
+    const t = Dictee.normaliser(m.result.text || "").replace(/\[unk\]/g, "").trim();
+    if (!t) return;
+    const e = eleves.find(x => x.nom === apprendreNom);
+    finApprendre();
+    if (!e) return;
+    if (t === Dictee.normaliser(e.nom)) {
+      journal(t, `<span class="ok">${esc(e.nom)} est déjà connu, rien à apprendre</span>`, null);
+      return;
+    }
+    if (!e.alias.includes(t)) e.alias = [...e.alias, t].slice(-3);
+    ecrire("eleves", eleves);
+    creerRec();
+    afficherEleves();
+    journal(t, `<span class="ok">${esc(e.nom)} appris : « ${esc(t)} »</span>`, null);
+    parler(e.nom + " appris");
+  });
+}
+
+function apprendre(i) {
+  if (mode === "arret") { $("bandeau").style.display = "block"; $("bandeau").textContent = "Démarre d'abord l'écoute."; setTimeout(() => { if (mode === "arret") $("bandeau").style.display = "none"; }, 2500); return; }
+  if (!recLibre) creerRecLibre();
+  apprendreNom = eleves[i].nom;
+  mode = "apprendre";
+  $("bandeau").style.display = "block";
+  $("bandeau").textContent = `Dis « ${apprendreNom} » une fois, normalement, puis attends.`;
+  clearTimeout(minuterie);
+  minuterie = setTimeout(() => { if (mode === "apprendre") { finApprendre(); journal("", `<span class="non">Apprentissage abandonné (rien entendu)</span>`, null); } }, 10000);
+}
+
+function finApprendre() {
+  clearTimeout(minuterie);
+  apprendreNom = null;
+  mode = "ecoute";
+  $("bandeau").style.display = "none";
+  $("entendu").textContent = "";
+}
+
+async function demarrer() {
+  $("go").disabled = true;
+  try {
+    flux = await navigator.mediaDevices.getUserMedia({ video: false, audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true, channelCount: 1 } });
+    ctx = new AudioContext();
+    creerRec();
+    noeud = ctx.createScriptProcessor(4096, 1, 1);
+    noeud.onaudioprocess = ev => {
+      if (muet) return;
+      const cible = mode === "apprendre" ? recLibre : rec;
+      if (!cible) return;
+      try { cible.acceptWaveform(ev.inputBuffer); } catch (e) {}
+    };
+    ctx.createMediaStreamSource(flux).connect(noeud);
+    noeud.connect(ctx.destination);
+    try { verrou = await navigator.wakeLock.request("screen"); } catch (e) {}
+    mode = "ecoute";
+    setEtat("écoute");
+    $("go").textContent = "Arrêter l'écoute";
+    $("go").classList.add("stop");
+  } catch (e) {
+    setEtat("micro refusé ou indisponible");
+    $("info").textContent = "Autorise le micro pour ce site dans Chrome, puis recharge la page.";
+  }
+  $("go").disabled = false;
+}
+
+function arreter() {
+  mode = "arret";
+  finApprendre(); mode = "arret";
+  try { noeud && noeud.disconnect(); } catch (e) {}
+  try { flux && flux.getTracks().forEach(t => t.stop()); } catch (e) {}
+  try { ctx && ctx.close(); } catch (e) {}
+  try { rec && rec.remove(); } catch (e) {}
+  try { recLibre && recLibre.remove(); } catch (e) {}
+  try { verrou && verrou.release(); } catch (e) {}
+  rec = recLibre = noeud = flux = ctx = verrou = null;
+  setEtat("arrêté");
+  $("entendu").textContent = "";
+  $("go").textContent = "Démarrer l'écoute";
+  $("go").classList.remove("stop");
+}
+
+$("go").addEventListener("click", () => { mode === "arret" ? demarrer() : arreter(); });
+$("eleves").addEventListener("click", ev => {
+  const b = ev.target.closest("button");
+  if (!b) return;
+  if (b.dataset.app !== undefined) apprendre(+b.dataset.app);
+  if (b.dataset.oubli !== undefined) {
+    eleves[+b.dataset.oubli].alias = [];
+    ecrire("eleves", eleves);
+    if (rec) creerRec();
+    afficherEleves();
+  }
+});
+$("bareme").value = bareme;
+$("bareme").addEventListener("change", () => { bareme = Math.max(1, +$("bareme").value || 20); ecrire("bareme", bareme); });
+$("voix").checked = voix;
+$("voix").addEventListener("change", () => { voix = $("voix").checked; ecrire("voix", voix); });
+$("liste").value = eleves.map(e => e.nom).join("\n");
+$("enreg").addEventListener("click", () => {
+  const noms = [...new Set($("liste").value.split("\n").map(s => s.trim()).filter(Boolean))];
+  eleves = noms.map(nom => eleves.find(e => e.nom === nom) || { nom, alias: [] });
+  ecrire("eleves", eleves);
+  if (rec) creerRec();
+  afficherEleves();
+  $("msgListe").textContent = noms.length + " prénoms";
+});
+document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible" && mode !== "arret") navigator.wakeLock?.request("screen").then(v => verrou = v).catch(() => {}); });
+
+afficherEleves();
+
+const lent = setTimeout(() => { if (!model) $("info").textContent = "Toujours en chargement… Si rien ne bouge après 2 minutes, recharge la page."; }, 60000);
+(async () => {
+  try {
+    model = await Vosk.createModel(MODELE);
+    clearTimeout(lent);
+    setEtat("prêt");
+    $("info").textContent = "Pose le téléphone à ta place habituelle, puis démarre.";
+    $("go").disabled = false;
+  } catch (e) {
+    setEtat("échec du chargement du modèle");
+    $("info").textContent = "Vérifie la connexion et recharge la page.";
+  }
+})();
+}
+</script>
+</body>
+</html>
