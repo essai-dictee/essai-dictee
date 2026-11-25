@@ -49,6 +49,7 @@ textarea{width:100%;min-height:9em;font:16px/1.4 inherit;padding:8px;border-radi
   <div>État : <span id="etat">chargement du modèle…</span></div>
   <div class="petit" id="info">Première fois : environ 42 Mo à télécharger (en wifi). Ensuite, le modèle reste dans le téléphone.</div>
   <button id="go" disabled>Démarrer l'écoute</button>
+  <div class="ligne" style="margin-top:10px"><label style="margin:0"><input type="checkbox" id="voix"> Répéter la note à voix haute</label><button id="testVoix">Tester la voix</button></div>
   <div id="bandeau"></div>
 </div>
 
@@ -72,7 +73,6 @@ textarea{width:100%;min-height:9em;font:16px/1.4 inherit;padding:8px;border-radi
 <h2>Réglages</h2>
 <div class="carte">
   <label>Barème <input type="number" id="bareme" min="1" max="100" value="20"></label>
-  <label><input type="checkbox" id="voix"> Répéter la note à voix haute</label>
   <div class="petit" style="margin-top:12px">Prénoms (un par ligne, inventés) :</div>
   <textarea id="liste"></textarea>
   <div class="ligne" style="margin-top:8px"><button id="enreg">Mettre à jour la liste</button><span class="petit" id="msgListe"></span></div>
@@ -95,7 +95,7 @@ function ecrire(cle, v) { try { localStorage.setItem(cle, JSON.stringify(v)); } 
 
 let eleves = lire("eleves", DEFAUT.map(nom => ({ nom, alias: [] })));
 let bareme = lire("bareme", 20);
-let voix = lire("voix", false);
+let voix = lire("voix", true);
 const notes = {};        // nom -> valeur (en mémoire seulement)
 const historique = [];   // pour « annule »
 let model = null, rec = null, recLibre = null;
@@ -129,14 +129,34 @@ function journal(brut, html, lat) {
   ol.prepend(li);
 }
 
-function parler(texte) {
-  if (!voix || !("speechSynthesis" in window)) return;
+function voixFr() {
+  const v = speechSynthesis.getVoices().filter(x => /^fr/i.test(x.lang));
+  return v.find(x => /fr[-_]FR/i.test(x.lang)) || v[0] || null;
+}
+
+let securite = null;
+function parler(texte, force) {
+  if ((!voix && !force) || !("speechSynthesis" in window)) {
+    if (force) journal("", `<span class="non">Voix : synthèse vocale absente de ce navigateur</span>`, null);
+    return;
+  }
   muet = true;
+  clearTimeout(securite);
+  // Filet : le micro se rouvre au plus tard après 4 s, même si Chrome ne signale jamais la fin.
+  securite = setTimeout(() => { muet = false; }, 4000);
   const u = new SpeechSynthesisUtterance(texte);
   u.lang = "fr-FR";
-  u.onend = u.onerror = () => setTimeout(() => { muet = false; }, 250);
-  speechSynthesis.cancel();
-  speechSynthesis.speak(u);
+  const v = voixFr(); if (v) u.voice = v;
+  u.volume = 1;
+  u.onend = () => { clearTimeout(securite); setTimeout(() => { muet = false; }, 250); };
+  u.onerror = e => {
+    clearTimeout(securite); muet = false;
+    if (e.error !== "interrupted" && e.error !== "canceled") journal(texte, `<span class="non">Voix : erreur « ${esc(e.error)} »</span>`, null);
+  };
+  const lancer = () => { speechSynthesis.resume(); speechSynthesis.speak(u); };
+  // Sur Chrome Android, « speak » juste après « cancel » est parfois avalé : on laisse un court délai.
+  if (speechSynthesis.speaking || speechSynthesis.pending) { speechSynthesis.cancel(); setTimeout(lancer, 80); }
+  else lancer();
 }
 
 function pourVoix(v) {
@@ -270,6 +290,7 @@ async function demarrer() {
     try { verrou = await navigator.wakeLock.request("screen"); } catch (e) {}
     mode = "ecoute";
     setEtat("écoute");
+    parler("écoute démarrée");
     $("go").textContent = "Arrêter l'écoute";
     $("go").classList.add("stop");
   } catch (e) {
@@ -315,6 +336,12 @@ $("eleves").addEventListener("click", ev => {
 $("bareme").value = bareme;
 $("bareme").addEventListener("change", () => { bareme = Math.max(1, +$("bareme").value || 20); ecrire("bareme", bareme); });
 $("voix").checked = voix;
+$("testVoix").addEventListener("click", () => {
+  const v = "speechSynthesis" in window ? voixFr() : null;
+  journal("", v ? `<span class="ok">Test voix : ${esc(v.name)} (${esc(v.lang)})</span>` : `<span class="non">Test voix : aucune voix française trouvée, essai avec la voix par défaut</span>`, null);
+  parler("Maxime, douze", true);
+});
+if ("speechSynthesis" in window) speechSynthesis.getVoices();
 $("voix").addEventListener("change", () => { voix = $("voix").checked; ecrire("voix", voix); });
 $("liste").value = eleves.map(e => e.nom).join("\n");
 $("enreg").addEventListener("click", () => {
