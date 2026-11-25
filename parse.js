@@ -34,11 +34,25 @@
     return f;
   }
 
+  // Mots d'un alias qui n'appartiennent qu'à cet élève (« van » pour « et van ») :
+  // s'ils sortent seuls, c'est forcément lui, car Vosk ne connaît que la liste.
+  function motsPropres(e, eleves) {
+    const base = new Set([...Object.keys(NOMBRES), ...COMMANDES, ...AUTRES]);
+    const autres = new Set();
+    for (const x of eleves) if (x !== e) formes(x).forEach(f => f.forEach(m => autres.add(m)));
+    const res = [];
+    for (const f of formes(e).slice(1)) {
+      if (f.length < 2) continue;
+      for (const m of f) if (!base.has(m) && !autres.has(m)) res.push([m]);
+    }
+    return res;
+  }
+
   // Cherche un élève qui commence à la position i. Prend la forme la plus longue.
   function eleveA(tokens, i, eleves) {
     let meilleur = null;
     for (const e of eleves) {
-      for (const f of formes(e)) {
+      for (const f of [...formes(e), ...motsPropres(e, eleves)]) {
         if (f.every((m, k) => tokens[i + k] === m)) {
           if (!meilleur || f.length > meilleur.long) meilleur = { eleve: e, long: f.length };
         }
