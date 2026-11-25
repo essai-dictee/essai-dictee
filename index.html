@@ -1,7 +1,8 @@
 <!DOCTYPE html>
-<html lang="fr">
+<html lang="fr" translate="no">
 <head>
 <meta charset="utf-8">
+<meta name="google" content="notranslate">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Essai dictée des notes</title>
 <style>
@@ -62,6 +63,7 @@ textarea{width:100%;min-height:9em;font:16px/1.4 inherit;padding:8px;border-radi
 <p class="petit">« Maxime douze » · « Simon quatorze virgule cinq » · « David dix et demi » · « Léo absent » · « Emma non rendu » · « Jules non noté » · « annule » · « pause » puis « reprends ».<br>Naël et Évan sont inconnus du modèle : démarre l'écoute, puis touche « Apprendre » à côté de leur prénom et dis-le une fois.</p>
 
 <h2>Journal</h2>
+<div class="ligne"><button id="copier">Copier le journal</button><span class="petit" id="msgCopie"></span></div>
 <div class="carte"><ol id="journal"><li class="petit">Rien pour l'instant.</li></ol></div>
 
 <h2>Élèves</h2>
@@ -101,6 +103,8 @@ let ctx = null, flux = null, noeud = null, verrou = null;
 let mode = "arret";      // arret | ecoute | pause | apprendre
 let muet = false, apprendreNom = null, minuterie = null;
 let dernierPartiel = "", tChangement = 0;
+let attente = null;      // prénom dit sans note, en attente de la phrase suivante
+const lignes = [];       // journal en texte, pour « Copier »
 
 function setEtat(t) { $("etat").textContent = t; }
 function esc(s) { return String(s).replace(/[&<>"']/g, c => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[c])); }
@@ -118,6 +122,8 @@ function journal(brut, html, lat) {
   if (ol.firstElementChild && ol.firstElementChild.classList.contains("petit")) ol.innerHTML = "";
   const li = document.createElement("li");
   const h = new Date().toLocaleTimeString("fr-FR");
+  const tmp = document.createElement("div"); tmp.innerHTML = html;
+  lignes.push(`${h} | entendu : ${brut} | ${tmp.textContent}${lat != null ? " | " + (lat / 1000).toFixed(1) + " s" : ""}`);
   li.innerHTML = `<div>${html} ${lat != null ? `<span class="lat">· ${(lat / 1000).toFixed(1).replace(".", ",")} s</span>` : ""}</div>
     <div class="brut">${h} · entendu : « ${esc(brut)} »</div>`;
   ol.prepend(li);
@@ -140,9 +146,20 @@ function pourVoix(v) {
   return String(v).replace(".", " virgule ");
 }
 
+function recevoir(t, lat) {
+  if (attente) { clearTimeout(attente.minuterie); t = attente.texte + " " + t; attente = null; }
+  traiter(t, lat);
+}
+
 function traiter(texte, lat) {
   const actions = Dictee.analyser(texte, eleves, bareme);
   for (const a of actions) {
+    if (a.suite && a === actions[actions.length - 1] && mode !== "pause") {
+      // Prénom sans note en fin de phrase : on attend 3 s la suite (« Évan » … « treize »).
+      const suite = a.suite;
+      attente = { texte: suite, minuterie: setTimeout(() => { attente = null; journal(suite, `<span class="non">Ignoré : note manquante</span>`, null); }, 3000) };
+      continue;
+    }
     if (mode === "pause" && !(a.type === "commande" && a.nom === "reprends")) continue;
     if (a.type === "commande") {
       if (a.nom === "pause") { mode = "pause"; setEtat("en pause (dis « reprends »)"); journal(texte, `<span class="ok">Pause</span>`, lat); parler("pause"); }
@@ -188,7 +205,7 @@ function creerRec() {
     dernierPartiel = ""; tChangement = 0;
     if (!t || mode === "apprendre") return;
     $("entendu").textContent = "";
-    traiter(t, lat);
+    recevoir(t, lat);
   });
   rec = r;
 }
@@ -278,6 +295,11 @@ function arreter() {
   $("go").classList.remove("stop");
 }
 
+$("copier").addEventListener("click", async () => {
+  const txt = lignes.join("\n") || "(journal vide)";
+  try { await navigator.clipboard.writeText(txt); $("msgCopie").textContent = "Copié : colle-le dans la conversation."; }
+  catch (e) { $("msgCopie").textContent = "Copie refusée par le navigateur."; }
+});
 $("go").addEventListener("click", () => { mode === "arret" ? demarrer() : arreter(); });
 $("eleves").addEventListener("click", ev => {
   const b = ev.target.closest("button");

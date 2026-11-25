@@ -64,6 +64,9 @@
       n += NOMBRES[tokens[i + long + 1]] / 10; long += 2;
     } else if (s === "et" && tokens[i + long + 1] === "demi") {
       n += 0.5; long += 2;
+    } else if (s === "demi") {
+      // Le « et » est souvent avalé : « dix demi » = 10,5
+      n += 0.5; long += 1;
     }
     return { valeur: n, long };
   }
@@ -82,7 +85,10 @@
       if (el) {
         const note = noteA(tokens, i + el.long);
         if (!note) {
-          actions.push({ type: "refus", raison: "note manquante", texte: el.eleve.nom });
+          // Prénom en fin de phrase : la note est peut-être dans la phrase suivante.
+          const enFin = i + el.long >= tokens.length;
+          actions.push({ type: "refus", raison: "note manquante", texte: el.eleve.nom,
+                         suite: enFin ? tokens.slice(i).join(" ") : null });
           i += el.long; continue;
         }
         const suivant = tokens[i + el.long + note.long];
