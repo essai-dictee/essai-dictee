@@ -1,0 +1,662 @@
+<!DOCTYPE html>
+<html lang="fr" translate="no">
+<head>
+<meta charset="utf-8">
+<meta name="google" content="notranslate">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Dictée des notes</title>
+<style>
+:root{color-scheme:light dark;--bg:light-dark(#f6f6f3,#16181b);--carte:light-dark(#fff,#202327);--ink:light-dark(#1b1d20,#ecedee);--doux:light-dark(#62666d,#9aa0a8);--trait:light-dark(#dcdcd6,#33373d);--ok:light-dark(#1d7a45,#4cc282);--non:light-dark(#b3261e,#ff8a80);--accent:light-dark(#1f4fd1,#7aa2ff);--choisi:light-dark(#e6edff,#26324f)}
+*{box-sizing:border-box;min-width:0}
+body{margin:0;background:var(--bg);color:var(--ink);font:17px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+main{max-width:640px;margin:0 auto;padding:16px 16px 48px}
+h1{font-size:26px;line-height:1.15;margin:4px 0 4px}
+h2{font-size:18px;margin:28px 0 8px}
+.petit{font-size:14px;color:var(--doux)}
+.carte{background:var(--carte);border:1px solid var(--trait);border-radius:14px;padding:14px 16px;margin-top:12px}
+button{font:inherit;min-height:44px;padding:8px 16px;border-radius:10px;border:1px solid var(--trait);background:var(--carte);color:var(--ink);cursor:pointer}
+button:focus-visible,input:focus-visible,select:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+button:disabled{opacity:.45;cursor:default}
+#go{width:100%;min-height:64px;font-size:20px;font-weight:600;background:var(--accent);color:#fff;border:0;margin-top:14px}
+#go.stop{background:var(--non)}
+#envoyer{display:none;width:100%;min-height:64px;font-size:20px;font-weight:600;background:var(--ok);color:#fff;border:0;margin-top:12px}
+.danger{color:var(--non);border-color:var(--non)}
+#etat{font-weight:600}
+#entendu{min-height:1.5em;color:var(--doux);font-style:italic}
+#derniere{font-size:36px;font-weight:700;line-height:1.1;min-height:1.1em;margin-top:6px}
+#bandeau{display:none;background:var(--accent);color:#fff;border-radius:10px;padding:12px 14px;margin-top:12px;font-weight:600}
+.ctx{font-size:18px;font-weight:600}
+ol{list-style:none;margin:0;padding:0}
+#journal li{border-top:1px solid var(--trait);padding:8px 0}
+#journal li:first-child{border-top:0}
+.brut{font-size:14px;color:var(--doux)}
+.ok{color:var(--ok);font-weight:600}.non{color:var(--non);font-weight:600}
+.lat{font-size:13px;color:var(--doux);white-space:nowrap}
+table{width:100%;border-collapse:collapse;font-size:16px}
+td{padding:6px 4px;border-top:1px solid var(--trait);vertical-align:middle}
+td.n{text-align:right;font-weight:700;white-space:nowrap;width:4.5em}
+td button{min-height:36px;padding:4px 10px;font-size:14px}
+tr.parti td{color:var(--doux)}
+.alias{font-size:13px;color:var(--doux)}
+label{display:flex;gap:10px;align-items:center;margin:8px 0}
+input[type=number],input[type=text],select{font:inherit;padding:6px 8px;border-radius:8px;border:1px solid var(--trait);background:var(--carte);color:var(--ink)}
+input[type=number]{width:6em}
+input[type=text]{flex:1}
+.ligne{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.choix{display:flex;flex-wrap:wrap;gap:8px}
+.choix button[aria-pressed=true]{background:var(--choisi);border-color:var(--accent);font-weight:600}
+.evals button{display:block;width:100%;text-align:left;margin-top:8px}
+.aide li{margin:4px 0}
+</style>
+</head>
+<body>
+<main>
+<h1>Dictée des notes</h1>
+<p class="petit">La reconnaissance se fait dans le téléphone. Rien n'est envoyé : les listes et les notes restent dans ce navigateur. Exporte à chaque arrêt.</p>
+
+<div class="carte">
+  <div>État : <span id="etat">chargement…</span></div>
+  <div class="petit" id="info">Première fois : environ 42 Mo à télécharger (en wifi). Ensuite, tout reste dans le téléphone.</div>
+  <button id="go" disabled>Démarrer l'écoute</button>
+  <div class="ligne" style="margin-top:10px"><label style="margin:0"><input type="checkbox" id="voix"> Répéter à voix haute</label><button id="testVoix">Tester la voix</button></div>
+  <div id="bandeau"></div>
+  <button id="envoyer">Envoyer le fichier</button>
+</div>
+
+<div class="carte">
+  <div class="petit">Classe et évaluation :</div>
+  <div class="ctx" id="ctx">Aucune classe choisie</div>
+  <div class="petit" style="margin-top:10px">J'entends :</div>
+  <div id="entendu"></div>
+  <div class="petit" style="margin-top:10px">Dernière note :</div>
+  <div id="derniere"></div>
+</div>
+
+<h2>Classes</h2>
+<div class="carte"><div class="choix" id="classes"><span class="petit">Aucune classe : importe le fichier du trimestre (en bas de page).</span></div></div>
+
+<h2>Évaluations</h2>
+<div class="carte">
+  <div class="evals" id="evals"><span class="petit">Choisis d'abord une classe.</span></div>
+  <div id="editEval" style="display:none;margin-top:14px;border-top:1px solid var(--trait);padding-top:10px">
+    <div class="petit">Évaluation choisie (modifiable) :</div>
+    <label>Description <input type="text" id="evDesc"></label>
+    <div class="ligne"><label>Sur <input type="number" id="evBareme" min="1" max="100" step="1"></label><label>Coef <input type="number" id="evCoef" min="0.1" max="10" step="0.1"></label></div>
+    <button id="evSuppr" class="danger">Supprimer cette évaluation</button>
+  </div>
+  <button id="nouvelleEval" style="margin-top:12px" disabled>+ Nouvelle évaluation</button>
+</div>
+
+<h2>Élèves</h2>
+<div class="carte"><table><tbody id="eleves"></tbody></table><div class="petit" id="elevesVide">Choisis une classe.</div></div>
+
+<h2>Fichiers</h2>
+<div class="carte">
+  <label>Trimestre <select id="trimestre"><option>T1</option><option>T2</option><option>T3</option></select></label>
+  <div class="ligne"><button id="importer">Importer le fichier du trimestre</button><input type="file" id="fichier" accept=".xlsx,.xls,.ods" hidden></div>
+  <div id="choixColonne" style="display:none;margin-top:10px">
+    <div class="petit">Touche la colonne prénom + initiale :</div>
+    <div class="choix" id="colonnes" style="margin-top:6px"></div>
+  </div>
+  <div class="petit" id="bilan" style="margin-top:8px"></div>
+  <div class="ligne" style="margin-top:12px"><button id="exporter">Exporter et envoyer</button></div>
+  <div class="petit" id="msgExport"></div>
+  <div class="ligne" style="margin-top:16px"><button id="nouveauTrim" class="danger">Nouveau trimestre</button></div>
+  <div class="petit">Efface les évaluations et les notes. Garde les classes, les élèves et les prénoms appris.</div>
+</div>
+
+<h2>Ce qu'on peut dire</h2>
+<div class="carte"><ul class="aide petit">
+  <li><b>Classe</b> : « classe cinquième bé »</li>
+  <li><b>Évaluation</b> : « nouvelle évaluation », « évaluation deux », « dernière évaluation », « liste des évaluations »</li>
+  <li><b>Notes</b> : « Emma douze », « Maxime treize virgule vingt-cinq » ou « treize et quart », « quinze et demi », « seize trois quarts », « Léo bé quatorze » (homonymes), « absent », « non rendu », « non noté »</li>
+  <li><b>Corrections</b> : « annule » (dernière note), « remplace » (après « a déjà… »)</li>
+  <li><b>Autres</b> : « qui manque », « pause » puis « reprends », « exporter »</li>
+</ul></div>
+
+<h2>Journal</h2>
+<div class="ligne"><button id="copier">Copier le journal</button><span class="petit" id="msgCopie"></span></div>
+<div class="carte"><ol id="journal"><li class="petit">Rien pour l'instant.</li></ol></div>
+
+<p class="petit" style="margin-top:28px">Reconnaissance : Vosk (vosk-browser 0.0.8), modèle vosk-model-small-fr-0.22 d'Alpha Cephei, licence Apache 2.0. Fichiers Excel : SheetJS Community Edition, licence Apache 2.0.</p>
+</main>
+
+<script src="https://cdn.jsdelivr.net/npm/vosk-browser@0.0.8/dist/vosk.js"></script>
+<script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
+<script src="moteur.js"></script>
+<script src="donnees.js"></script>
+<script>
+{
+const $ = id => document.getElementById(id);
+const M = Moteur, D = Donnees;
+const MODELE = new URL("../model/vosk-model-small-fr-0.22.tar.gz", location.href).href;
+
+// ---------- Stockage ----------
+function lire(cle, def) { try { const v = localStorage.getItem(cle); return v ? JSON.parse(v) : def; } catch (e) { return def; } }
+function ecrire(cle, v) { try { localStorage.setItem(cle, JSON.stringify(v)); return true; } catch (e) { return false; } }
+let etat = lire("appli.etat", null) || D.etatVide();
+let voix = lire("appli.voix", true);
+function sauver() { if (!ecrire("appli.etat", etat)) journal("", `<span class="non">Enregistrement impossible dans le téléphone : exporte tout de suite</span>`, null); }
+
+// ---------- Variables ----------
+let model = null, rec = null, recLibre = null, signature = "";
+let ctxAudio = null, flux = null, noeud = null, verrou = null;
+let mode = "arret";          // arret | ecoute | pause | apprendre | dlg
+let dlg = null;              // { etape: desc|bareme|coef|valider, desc, bareme, coef }
+let muet = false, apprendreCle = null, minuterie = null, securite = null;
+let dernierPartiel = "", tChangement = 0, attente = null, enAttenteRemplace = null;
+let fichierPret = null;      // { blob, nom }
+let classeurImporte = null;
+const historique = [];       // pour « annule »
+const lignes = [];
+
+function esc(s) { return String(s).replace(/[&<>"']/g, c => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[c])); }
+function setEtat(t) { $("etat").textContent = t; }
+function bandeau(t) { $("bandeau").style.display = t ? "block" : "none"; $("bandeau").textContent = t || ""; }
+
+// ---------- Contexte courant ----------
+function classe() { return etat.classes.find(c => c.nom === etat.courant.classe) || null; }
+function evaluation() { const c = classe(); return c ? c.evals.find(e => e.id === etat.courant.eval) || null : null; }
+function numeroEval(c, ev) { return c.evals.indexOf(ev) + 1; }
+function elevesActifs(c) { return c.eleves.filter(e => !e.parti); }
+function nomVoix(cle) { const c = classe(); const p = M.preparerEleves(c ? elevesActifs(c) : []).find(e => e.cle === cle); const d = M.decouperCle(cle); return p && p.homonyme && d.initiale ? `${d.prenom} ${d.initiale.toUpperCase()}` : d.prenom; }
+function coefVoix(c) { return String(c).replace(".", " virgule "); }
+
+// ---------- Affichage ----------
+function afficher() {
+  const c = classe(), ev = evaluation();
+  $("ctx").textContent = !c ? "Aucune classe choisie" : !ev ? `${c.nom} · aucune évaluation choisie` : `${c.nom} · ${numeroEval(c, ev)}. ${ev.desc} · /${M.formater(ev.bareme)} · coef ${M.formater(ev.coef)}`;
+  $("classes").innerHTML = etat.classes.length ? etat.classes.map((x, i) => `<button data-classe="${i}" aria-pressed="${x === c}">${esc(x.nom)}</button>`).join("")
+    : `<span class="petit">Aucune classe : importe le fichier du trimestre (en bas de page).</span>`;
+  $("nouvelleEval").disabled = !c;
+  if (!c) $("evals").innerHTML = `<span class="petit">Choisis d'abord une classe.</span>`;
+  else if (!c.evals.length) $("evals").innerHTML = `<span class="petit">Aucune évaluation. Dis « nouvelle évaluation » ou touche le bouton.</span>`;
+  else {
+    const n = elevesActifs(c).length;
+    $("evals").innerHTML = c.evals.map((e, i) => {
+      const faits = elevesActifs(c).filter(x => e.notes[x.cle] !== undefined).length;
+      return `<button data-eval="${e.id}" aria-pressed="${e === ev}">${i + 1}. ${esc(e.desc)} · /${esc(M.formater(e.bareme))} · coef ${esc(M.formater(e.coef))} · ${faits}/${n}</button>`;
+    }).join("");
+    $("evals").querySelectorAll("button").forEach(b => b.setAttribute("aria-pressed", String(ev && b.dataset.eval == ev.id)));
+  }
+  $("editEval").style.display = ev ? "block" : "none";
+  if (ev && document.activeElement?.closest?.("#editEval") == null) {
+    $("evDesc").value = ev.desc; $("evBareme").value = ev.bareme; $("evCoef").value = ev.coef;
+  }
+  $("elevesVide").style.display = c ? "none" : "block";
+  $("eleves").innerHTML = !c ? "" : c.eleves.map((e, i) => `<tr class="${e.parti ? "parti" : ""}">
+    <td>${esc(e.cle)}${e.parti ? ` <span class="alias">(plus dans la liste)</span>` : ""}${e.alias.length ? `<div class="alias">entendu comme : ${e.alias.map(a => "« " + esc(a) + " »").join(", ")}</div>` : ""}</td>
+    <td class="n">${ev && ev.notes[e.cle] !== undefined ? esc(M.formater(ev.notes[e.cle])) : "—"}</td>
+    <td style="text-align:right;white-space:nowrap">${e.parti ? "" : `<button data-app="${i}">Apprendre</button>${e.alias.length ? ` <button data-oubli="${i}" aria-label="Oublier">✕</button>` : ""}`}</td></tr>`).join("");
+  $("trimestre").value = etat.trimestre;
+  majRec();
+}
+
+function journal(brut, html, lat) {
+  const ol = $("journal");
+  if (ol.firstElementChild && ol.firstElementChild.classList.contains("petit")) ol.innerHTML = "";
+  const li = document.createElement("li");
+  const h = new Date().toLocaleTimeString("fr-FR");
+  const tmp = document.createElement("div"); tmp.innerHTML = html;
+  lignes.push(`${h} | entendu : ${brut} | ${tmp.textContent}${lat != null ? " | " + (lat / 1000).toFixed(1) + " s" : ""}`);
+  li.innerHTML = `<div>${html} ${lat != null ? `<span class="lat">· ${(lat / 1000).toFixed(1).replace(".", ",")} s</span>` : ""}</div>${brut ? `<div class="brut">${h} · entendu : « ${esc(brut)} »</div>` : `<div class="brut">${h}</div>`}`;
+  ol.prepend(li);
+  while (ol.children.length > 200) ol.lastElementChild.remove();
+}
+
+// ---------- Voix ----------
+function voixFr() {
+  const v = speechSynthesis.getVoices().filter(x => /^fr/i.test(x.lang));
+  return v.find(x => /fr[-_]FR/i.test(x.lang)) || v[0] || null;
+}
+function parler(texte, force) {
+  if ((!voix && !force) || !("speechSynthesis" in window)) return;
+  muet = true;
+  clearTimeout(securite);
+  // Filet : le micro se rouvre même si Chrome ne signale jamais la fin de la phrase.
+  securite = setTimeout(() => { muet = false; }, Math.max(4000, texte.length * 110));
+  const u = new SpeechSynthesisUtterance(texte);
+  u.lang = "fr-FR";
+  const v = voixFr(); if (v) u.voice = v;
+  u.onend = () => { clearTimeout(securite); setTimeout(() => { muet = false; }, 250); };
+  u.onerror = e => { clearTimeout(securite); muet = false; if (e.error !== "interrupted" && e.error !== "canceled") journal("", `<span class="non">Voix : erreur « ${esc(e.error)} » en disant « ${esc(texte)} »</span>`, null); };
+  const lancer = () => { speechSynthesis.resume(); speechSynthesis.speak(u); };
+  if (speechSynthesis.speaking || speechSynthesis.pending) { speechSynthesis.cancel(); setTimeout(lancer, 80); } else lancer();
+}
+
+// ---------- Reconnaissance ----------
+function grammaire() {
+  const noms = etat.classes.map(c => c.nom);
+  if (mode === "dlg" && dlg && dlg.etape !== "desc") return M.grammaireDialogue();
+  const c = classe(), ev = evaluation();
+  if (!c) return M.grammaireNavigation(noms);
+  return M.grammaireNotes(M.preparerEleves(elevesActifs(c)), ev ? ev.bareme : 20, noms);
+}
+function majRec() {
+  if (!model || !ctxAudio) return;
+  const g = JSON.stringify([...grammaire(), "[unk]"]);
+  if (g === signature && rec) return;
+  signature = g;
+  const ancien = rec; rec = null;
+  if (ancien) { try { ancien.remove(); } catch (e) {} }
+  const r = new model.KaldiRecognizer(ctxAudio.sampleRate, g);
+  r.on("partialresult", m => {
+    const p = m.result.partial || "";
+    if (p !== dernierPartiel) { dernierPartiel = p; tChangement = performance.now(); }
+    if (cible() === r) $("entendu").textContent = p;
+  });
+  r.on("result", m => {
+    const t = (m.result.text || "").trim();
+    const lat = tChangement ? performance.now() - tChangement : null;
+    dernierPartiel = ""; tChangement = 0;
+    if (!t || cible() !== r) return;
+    $("entendu").textContent = "";
+    if (mode === "dlg") dialogue(t); else recevoir(t, lat);
+  });
+  rec = r;
+}
+function creerRecLibre() {
+  recLibre = new model.KaldiRecognizer(ctxAudio.sampleRate);
+  recLibre.on("partialresult", m => { if (cible() === recLibre) $("entendu").textContent = m.result.partial || ""; });
+  recLibre.on("result", m => {
+    if (cible() !== recLibre) return;
+    const t = M.normaliser(m.result.text || "").replace(/\bunk\b/g, "").trim();
+    if (!t) return;
+    $("entendu").textContent = "";
+    if (mode === "apprendre") finirApprendre(t);
+    else if (mode === "dlg") dialogue(t);
+  });
+}
+function cible() { return (mode === "apprendre" || (mode === "dlg" && dlg && dlg.etape === "desc")) ? recLibre : rec; }
+
+// ---------- Saisie ----------
+function recevoir(t, lat) {
+  if (attente) { clearTimeout(attente.minuterie); t = attente.texte + " " + t; attente = null; }
+  const c = classe(), ev = evaluation();
+  const actions = M.analyser(t, { prep: c ? M.preparerEleves(elevesActifs(c)) : [], bareme: ev ? ev.bareme : null, classes: etat.classes.map(x => x.nom) });
+  for (const a of actions) {
+    if (mode === "pause" && !(a.type === "commande" && a.nom === "reprends")) continue;
+    if (a.suite && a === actions[actions.length - 1]) {
+      const suite = a.suite;
+      attente = { texte: suite, minuterie: setTimeout(() => { attente = null; journal(suite, `<span class="non">Ignoré : note manquante</span>`, null); }, 3000) };
+      continue;
+    }
+    if (a.type === "note") noter(a.cle, a.valeur, t, lat);
+    else if (a.type === "commande") commande(a, t, lat);
+    else journal(t, `<span class="non">Ignoré : ${esc(a.raison)}</span>`, lat);
+  }
+  afficher();
+}
+
+function noter(cle, valeur, t, lat) {
+  const c = classe(), ev = evaluation();
+  const avant = ev.notes[cle];
+  if (avant !== undefined && avant !== valeur) {
+    clearTimeout(enAttenteRemplace?.minuterie);
+    enAttenteRemplace = { cle, valeur, ev, minuterie: setTimeout(() => { enAttenteRemplace = null; }, 5000) };
+    journal(t, `<span class="non">${esc(cle)} a déjà ${esc(M.formater(avant))} : dis « remplace » pour mettre ${esc(M.formater(valeur))}</span>`, lat);
+    parler(`${nomVoix(cle)} a déjà ${M.pourVoix(avant)}. Dis remplace.`);
+    return;
+  }
+  appliquer(ev, cle, valeur);
+  journal(t, `<span class="ok">${esc(cle)} : ${esc(M.formater(valeur))}</span>`, lat);
+  parler(`${nomVoix(cle)}, ${M.pourVoix(valeur)}`);
+}
+function appliquer(ev, cle, valeur) {
+  historique.push({ ev, cle, avant: ev.notes[cle] });
+  ev.notes[cle] = valeur;
+  etat.modifie = true;
+  sauver();
+  $("derniere").textContent = `${cle} : ${M.formater(valeur)}`;
+}
+
+function commande(a, t, lat) {
+  const c = classe();
+  const ok = (msg, dit) => { journal(t, `<span class="ok">${esc(msg)}</span>`, lat); if (dit) parler(dit); };
+  const non = (msg, dit) => { journal(t, `<span class="non">${esc(msg)}</span>`, lat); if (dit) parler(dit); };
+  switch (a.nom) {
+    case "pause": mode = "pause"; setEtat("en pause (dis « reprends »)"); ok("Pause", "pause"); break;
+    case "reprends": mode = "ecoute"; setEtat("écoute"); ok("Reprise", "je reprends"); break;
+    case "annule": {
+      const d = historique.pop();
+      if (!d) return non("Rien à annuler", "rien à annuler");
+      if (d.avant === undefined) delete d.ev.notes[d.cle]; else d.ev.notes[d.cle] = d.avant;
+      sauver(); $("derniere").textContent = "";
+      return ok(`Annulé : ${d.cle}`, "annulé");
+    }
+    case "remplace": {
+      const r = enAttenteRemplace;
+      if (!r) return non("Rien à remplacer", "rien à remplacer");
+      clearTimeout(r.minuterie); enAttenteRemplace = null;
+      appliquer(r.ev, r.cle, r.valeur);
+      return ok(`${r.cle} : ${M.formater(r.valeur)} (remplacé)`, `${nomVoix(r.cle)}, ${M.pourVoix(r.valeur)}`);
+    }
+    case "qui manque": {
+      const ev = evaluation();
+      if (!ev) return non("Aucune évaluation choisie", "choisis d'abord une évaluation");
+      const manque = elevesActifs(c).filter(e => ev.notes[e.cle] === undefined);
+      if (!manque.length) return ok("Toutes les notes sont saisies", "il ne manque personne");
+      return ok(`Il manque ${manque.length} : ${manque.map(e => e.cle).join(", ")}`, `Il manque ${manque.length} ${manque.length > 1 ? "notes" : "note"} : ${manque.map(e => nomVoix(e.cle)).join(", ")}`);
+    }
+    case "classe": {
+      const x = etat.classes.find(k => k.nom === a.arg);
+      choisirClasse(x);
+      return ok(`Classe ${x.nom}`, `${x.nom}, ${elevesActifs(x).length} élèves, ${x.evals.length ? x.evals.length + (x.evals.length > 1 ? " évaluations. Choisis une évaluation." : " évaluation. Choisis une évaluation.") : "aucune évaluation. Dis nouvelle évaluation."}`);
+    }
+    case "évaluation": {
+      if (!c) return non("Aucune classe choisie", "choisis d'abord une classe");
+      const ev = a.arg === "dernière" ? c.evals[c.evals.length - 1] : c.evals[a.arg - 1];
+      if (!ev) return non(`Pas d'évaluation ${a.arg}`, `il n'y a pas d'évaluation ${a.arg === "dernière" ? "" : a.arg}`);
+      etat.courant.eval = ev.id; sauver();
+      return ok(`Évaluation ${numeroEval(c, ev)} : ${ev.desc}`, `Évaluation ${numeroEval(c, ev)} : ${ev.desc}, sur ${ev.bareme}, coefficient ${coefVoix(ev.coef)}.`);
+    }
+    case "liste des évaluations": {
+      if (!c) return non("Aucune classe choisie", "choisis d'abord une classe");
+      if (!c.evals.length) return ok("Aucune évaluation", "aucune évaluation");
+      return ok(`${c.evals.length} évaluations`, c.evals.map((e, i) => `${i + 1} : ${e.desc}`).join(". "));
+    }
+    case "nouvelle évaluation":
+      if (!c) return non("Aucune classe choisie", "choisis d'abord une classe");
+      ok("Nouvelle évaluation"); return debutDialogue();
+    case "exporter":
+      if (preparerExport()) { ok(`Fichier prêt : ${fichierPret.nom}`, "Fichier prêt. Touche Envoyer."); }
+      else non("Export impossible", "export impossible");
+      return;
+  }
+}
+
+function choisirClasse(x) {
+  etat.courant.classe = x ? x.nom : null;
+  etat.courant.eval = null;
+  historique.length = 0;
+  sauver();
+}
+
+// ---------- Création vocale d'une évaluation ----------
+function debutDialogue() {
+  mode = "dlg"; dlg = { etape: "desc" };
+  if (!recLibre) creerRecLibre();
+  bandeau("Nouvelle évaluation : dis la description (ou « annule »).");
+  majRec();
+  parler("Description ?", true);
+}
+function finDialogue(msg) {
+  mode = "ecoute"; dlg = null; bandeau(""); setEtat("écoute");
+  majRec(); afficher();
+  if (msg) parler(msg, true);
+}
+function dialogue(t) {
+  const c = classe();
+  if (!c) return finDialogue();
+  const tn = M.mots(t);
+  if (tn.length === 1 && tn[0] === "annule" || (dlg.etape !== "desc" && M.lireOuiNon(t) === "annule")) {
+    journal(t, `<span class="non">Création annulée</span>`, null); return finDialogue("Création annulée.");
+  }
+  if (dlg.etape === "desc") {
+    dlg.desc = t.charAt(0).toUpperCase() + t.slice(1);
+    dlg.etape = "bareme"; majRec();
+    bandeau(`« ${dlg.desc} » · sur combien ?`);
+    journal(t, `<span class="ok">Description : ${esc(dlg.desc)}</span>`, null);
+    return parler(`${dlg.desc}. Sur combien ?`, true);
+  }
+  if (dlg.etape === "bareme") {
+    const b = M.lireBareme(t);
+    if (b == null) { journal(t, `<span class="non">Barème non compris</span>`, null); return parler("Je n'ai pas compris. Sur combien ?", true); }
+    dlg.bareme = b; dlg.etape = "coef";
+    bandeau(`« ${dlg.desc} » · sur ${b} · coefficient ?`);
+    return parler("Coefficient ?", true);
+  }
+  if (dlg.etape === "coef") {
+    const k = M.lireCoef(t);
+    if (k == null) { journal(t, `<span class="non">Coefficient non compris</span>`, null); return parler("Je n'ai pas compris. Coefficient ?", true); }
+    dlg.coef = k; dlg.etape = "valider";
+    bandeau(`« ${dlg.desc} » · sur ${dlg.bareme} · coef ${M.formater(k)} · je valide ?`);
+    return parler(`${dlg.desc}, sur ${dlg.bareme}, coefficient ${coefVoix(k)}. Je valide ?`, true);
+  }
+  if (dlg.etape === "valider") {
+    const r = M.lireOuiNon(t);
+    if (r === "oui") {
+      const ev = creerEval(c, dlg.desc, dlg.bareme, dlg.coef);
+      journal(t, `<span class="ok">Évaluation ${numeroEval(c, ev)} créée : ${esc(ev.desc)}</span>`, null);
+      return finDialogue(`Évaluation ${numeroEval(c, ev)} créée. Tu peux dicter les notes.`);
+    }
+    if (r === "non") { dlg = { etape: "desc" }; majRec(); bandeau("On recommence : dis la description."); return parler("On recommence. Description ?", true); }
+    return parler("Dis oui ou non.", true);
+  }
+}
+function creerEval(c, desc, bareme, coef) {
+  const id = Date.now();
+  const ev = { id, desc, bareme, coef, notes: {} };
+  c.evals.push(ev);
+  etat.courant.eval = id; etat.modifie = true;
+  sauver();
+  return ev;
+}
+
+// ---------- Apprendre un prénom ----------
+function apprendre(i) {
+  if (mode === "arret") { bandeau("Démarre d'abord l'écoute."); setTimeout(() => { if (mode === "arret") bandeau(""); }, 2500); return; }
+  if (!recLibre) creerRecLibre();
+  apprendreCle = classe().eleves[i].cle;
+  mode = "apprendre";
+  bandeau(`Dis « ${M.decouperCle(apprendreCle).prenom} » (ou « ${apprendreCle.replace(/\.$/, "")} » pour un homonyme) une fois, puis attends.`);
+  clearTimeout(minuterie);
+  minuterie = setTimeout(() => { if (mode === "apprendre") { quitterApprendre(); journal("", `<span class="non">Apprentissage abandonné (rien entendu)</span>`, null); } }, 10000);
+}
+function quitterApprendre() { clearTimeout(minuterie); apprendreCle = null; mode = "ecoute"; bandeau(""); $("entendu").textContent = ""; }
+function finirApprendre(t) {
+  const c = classe(); const e = c && c.eleves.find(x => x.cle === apprendreCle);
+  quitterApprendre();
+  if (!e) return;
+  if (!e.alias.includes(t)) e.alias = [...e.alias, t].slice(-3);
+  sauver(); afficher();
+  journal(t, `<span class="ok">${esc(e.cle)} appris : « ${esc(t)} »</span>`, null);
+  parler(`${nomVoix(e.cle)} appris`);
+}
+
+// ---------- Démarrer / arrêter ----------
+async function demarrer() {
+  $("go").disabled = true;
+  try {
+    flux = await navigator.mediaDevices.getUserMedia({ video: false, audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true, channelCount: 1 } });
+    ctxAudio = new AudioContext();
+    signature = "";
+    majRec();
+    noeud = ctxAudio.createScriptProcessor(4096, 1, 1);
+    noeud.onaudioprocess = ev => {
+      if (muet) return;
+      const r = cible();
+      if (!r) return;
+      try { r.acceptWaveform(ev.inputBuffer); } catch (e) {}
+    };
+    ctxAudio.createMediaStreamSource(flux).connect(noeud);
+    noeud.connect(ctxAudio.destination);
+    try { verrou = await navigator.wakeLock.request("screen"); } catch (e) {}
+    mode = "ecoute";
+    setEtat("écoute");
+    parler("écoute démarrée");
+    $("go").textContent = "Arrêter l'écoute";
+    $("go").classList.add("stop");
+  } catch (e) {
+    setEtat("micro refusé ou indisponible");
+    $("info").textContent = "Autorise le micro pour ce site dans Chrome, puis recharge la page.";
+  }
+  $("go").disabled = false;
+}
+function arreter() {
+  if (mode === "apprendre") quitterApprendre();
+  mode = "arret"; dlg = null; bandeau("");
+  try { noeud && noeud.disconnect(); } catch (e) {}
+  try { flux && flux.getTracks().forEach(t => t.stop()); } catch (e) {}
+  try { ctxAudio && ctxAudio.close(); } catch (e) {}
+  try { rec && rec.remove(); } catch (e) {}
+  try { recLibre && recLibre.remove(); } catch (e) {}
+  try { verrou && verrou.release(); } catch (e) {}
+  rec = recLibre = noeud = flux = ctxAudio = verrou = null; signature = "";
+  setEtat("arrêté");
+  $("entendu").textContent = "";
+  $("go").textContent = "Démarrer l'écoute";
+  $("go").classList.remove("stop");
+  if (etat.modifie) bandeau("Pense à exporter : des notes n'ont pas encore été envoyées.");
+}
+
+// ---------- Import ----------
+$("importer").addEventListener("click", () => {
+  if (!window.XLSX) { $("bilan").textContent = "Bibliothèque Excel non chargée : vérifie la connexion et recharge la page."; return; }
+  $("fichier").click();
+});
+$("fichier").addEventListener("change", async () => {
+  const f = $("fichier").files[0];
+  $("fichier").value = "";
+  if (!f) return;
+  try {
+    classeurImporte = XLSX.read(await f.arrayBuffer());
+  } catch (e) { $("bilan").textContent = "Fichier illisible."; return; }
+  const { titres } = D.titresColonnes(classeurImporte);
+  if (etat.colonne && titres.some(x => x.toLowerCase() === etat.colonne.toLowerCase())) return importerAvec(etat.colonne);
+  $("colonnes").innerHTML = titres.map((x, i) => `<button data-col="${i}">${esc(x)}</button>`).join("") || `<span class="petit">Aucun titre de colonne trouvé dans la première feuille.</span>`;
+  $("colonnes").dataset.titres = JSON.stringify(titres);
+  $("choixColonne").style.display = "block";
+  $("bilan").textContent = "";
+});
+$("colonnes").addEventListener("click", ev => {
+  const b = ev.target.closest("button"); if (!b) return;
+  importerAvec(JSON.parse($("colonnes").dataset.titres)[+b.dataset.col]);
+});
+function importerAvec(titre) {
+  $("choixColonne").style.display = "none";
+  const { listes, ignorees } = D.extraireListes(classeurImporte, titre);
+  classeurImporte = null;
+  if (!listes.length) { $("bilan").textContent = `Aucune feuille ne contient la colonne « ${titre} ».`; return; }
+  etat.colonne = titre;
+  const bilan = D.fusionner(etat, listes, $("trimestre").value);
+  sauver(); afficher();
+  const txt = bilan.map(b => `${b.nom} : ${b.eleves} élèves${b.nouvelle ? "" : `${b.ajoutes ? `, ${b.ajoutes} nouveau(x)` : ""}${b.partis ? `, ${b.partis} plus dans la liste` : ""}`}${b.doublons.length ? ` (en double, ignoré : ${b.doublons.join(", ")})` : ""}`);
+  if (ignorees.length) txt.push(`Feuilles ignorées (pas de colonne « ${titre} ») : ${ignorees.join(", ")}`);
+  $("bilan").innerHTML = `Import fait (colonne « ${esc(titre)} »). ${txt.map(esc).join(" · ")}<br>Tu peux supprimer le fichier reçu si tu n'en as plus besoin.`;
+  journal("", `<span class="ok">Import : ${listes.length} classe(s)</span>`, null);
+}
+$("trimestre").addEventListener("change", () => { etat.trimestre = $("trimestre").value; sauver(); });
+
+// ---------- Export ----------
+function preparerExport() {
+  if (!window.XLSX) { $("msgExport").textContent = "Bibliothèque Excel non chargée : vérifie la connexion et recharge la page."; return false; }
+  if (!etat.classes.length) { $("msgExport").textContent = "Rien à exporter : importe d'abord les classes."; return false; }
+  const wb = D.construireClasseur(etat);
+  const data = XLSX.write(wb, { type: "array", bookType: "xlsx" });
+  fichierPret = { blob: new Blob([data], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" }), nom: D.nomFichier(etat) };
+  $("envoyer").style.display = "block";
+  $("envoyer").textContent = `Envoyer ${fichierPret.nom}`;
+  $("msgExport").textContent = `Fichier prêt : ${fichierPret.nom} (${Math.ceil(fichierPret.blob.size / 1024)} Ko).`;
+  return true;
+}
+async function envoyer() {
+  if (!fichierPret) return;
+  const file = new File([fichierPret.blob], fichierPret.nom, { type: fichierPret.blob.type });
+  try {
+    if (navigator.canShare && navigator.canShare({ files: [file] })) {
+      await navigator.share({ files: [file], title: fichierPret.nom });
+      reussi("partagé");
+      return;
+    }
+  } catch (e) {
+    if (e.name === "AbortError") { $("msgExport").textContent = "Partage annulé. Le fichier est toujours prêt."; return; }
+  }
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(file); a.download = fichierPret.nom;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 10000);
+  reussi("enregistré dans Téléchargements");
+}
+function reussi(comment) {
+  $("msgExport").textContent = `${fichierPret.nom} ${comment}.`;
+  journal("", `<span class="ok">Export ${esc(comment)} : ${esc(fichierPret.nom)}</span>`, null);
+  etat.modifie = false; sauver();
+  $("envoyer").style.display = "none";
+  if ($("bandeau").textContent.startsWith("Pense à exporter")) bandeau("");
+}
+$("envoyer").addEventListener("click", envoyer);
+$("exporter").addEventListener("click", () => { if (preparerExport()) envoyer(); });
+
+// ---------- Nouveau trimestre (deux appuis) ----------
+let armeTrim = null;
+$("nouveauTrim").addEventListener("click", () => {
+  if (!armeTrim) {
+    $("nouveauTrim").textContent = etat.modifie ? "Notes non exportées ! Toucher encore pour tout effacer" : "Toucher encore pour effacer les notes";
+    armeTrim = setTimeout(() => { armeTrim = null; $("nouveauTrim").textContent = "Nouveau trimestre"; }, 5000);
+    return;
+  }
+  clearTimeout(armeTrim); armeTrim = null; $("nouveauTrim").textContent = "Nouveau trimestre";
+  for (const c of etat.classes) { c.evals = []; c.eleves = c.eleves.filter(e => !e.parti); }
+  etat.courant.eval = null; etat.modifie = false; historique.length = 0;
+  sauver(); afficher();
+  journal("", `<span class="ok">Nouveau trimestre : évaluations et notes effacées</span>`, null);
+});
+
+// ---------- Écrans ----------
+$("classes").addEventListener("click", ev => {
+  const b = ev.target.closest("button"); if (!b) return;
+  choisirClasse(etat.classes[+b.dataset.classe]); afficher();
+});
+$("evals").addEventListener("click", ev => {
+  const b = ev.target.closest("button"); if (!b) return;
+  etat.courant.eval = +b.dataset.eval; historique.length = 0; sauver(); afficher();
+});
+$("nouvelleEval").addEventListener("click", () => {
+  const c = classe(); if (!c) return;
+  if (mode === "ecoute") return debutDialogue();
+  creerEval(c, `Évaluation ${c.evals.length + 1}`, 20, 1); afficher();
+});
+$("evDesc").addEventListener("change", () => { const ev = evaluation(); if (ev && $("evDesc").value.trim()) { ev.desc = $("evDesc").value.trim(); etat.modifie = true; sauver(); afficher(); } });
+$("evBareme").addEventListener("change", () => { const ev = evaluation(); const v = Math.round(+$("evBareme").value); if (ev && v >= 1 && v <= 100) { ev.bareme = v; etat.modifie = true; sauver(); } afficher(); });
+$("evCoef").addEventListener("change", () => { const ev = evaluation(); const v = Math.round(+$("evCoef").value * 10) / 10; if (ev && v >= 0.1 && v <= 10) { ev.coef = v; etat.modifie = true; sauver(); } afficher(); });
+let armeSuppr = null;
+$("evSuppr").addEventListener("click", () => {
+  const c = classe(), ev = evaluation(); if (!ev) return;
+  if (!armeSuppr) { $("evSuppr").textContent = "Toucher encore pour supprimer (notes comprises)"; armeSuppr = setTimeout(() => { armeSuppr = null; $("evSuppr").textContent = "Supprimer cette évaluation"; }, 5000); return; }
+  clearTimeout(armeSuppr); armeSuppr = null; $("evSuppr").textContent = "Supprimer cette évaluation";
+  c.evals = c.evals.filter(e => e !== ev); etat.courant.eval = null; etat.modifie = true; historique.length = 0;
+  sauver(); afficher();
+});
+$("eleves").addEventListener("click", ev => {
+  const b = ev.target.closest("button"); if (!b) return;
+  if (b.dataset.app !== undefined) apprendre(+b.dataset.app);
+  if (b.dataset.oubli !== undefined) { classe().eleves[+b.dataset.oubli].alias = []; sauver(); afficher(); }
+});
+$("copier").addEventListener("click", async () => {
+  const txt = lignes.join("\n") || "(journal vide)";
+  try { await navigator.clipboard.writeText(txt); $("msgCopie").textContent = "Copié."; } catch (e) { $("msgCopie").textContent = "Copie refusée par le navigateur."; }
+});
+$("go").addEventListener("click", () => { mode === "arret" ? demarrer() : arreter(); });
+$("voix").checked = voix;
+$("voix").addEventListener("change", () => { voix = $("voix").checked; ecrire("appli.voix", voix); });
+$("testVoix").addEventListener("click", () => {
+  const v = "speechSynthesis" in window ? voixFr() : null;
+  journal("", v ? `<span class="ok">Test voix : ${esc(v.name)} (${esc(v.lang)})</span>` : `<span class="non">Test voix : aucune voix française trouvée</span>`, null);
+  parler("Maxime, douze", true);
+});
+if ("speechSynthesis" in window) speechSynthesis.getVoices();
+document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible" && mode !== "arret") navigator.wakeLock?.request("screen").then(v => verrou = v).catch(() => {}); });
+try { navigator.storage?.persist?.(); } catch (e) {}
+
+afficher();
+
+// ---------- Chargement du modèle ----------
+const lent = setTimeout(() => { if (!model) $("info").textContent = "Toujours en chargement… Si rien ne bouge après 2 minutes, recharge la page."; }, 60000);
+(async () => {
+  if (!window.Vosk) { setEtat("moteur de reconnaissance non chargé"); $("info").textContent = "Vérifie la connexion et recharge la page."; return; }
+  try {
+    model = await Vosk.createModel(MODELE);
+    clearTimeout(lent);
+    setEtat("prêt");
+    $("info").textContent = etat.classes.length ? "Démarre, puis dis « classe … »." : "Importe d'abord le fichier du trimestre (en bas de page).";
+    $("go").disabled = false;
+  } catch (e) {
+    setEtat("échec du chargement du modèle");
+    $("info").textContent = "Vérifie la connexion et recharge la page.";
+  }
+})();
+}
+</script>
+</body>
+</html>
