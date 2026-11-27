@@ -187,8 +187,9 @@ function afficher() {
     $("evDesc").value = ev.desc; $("evBareme").value = ev.bareme; $("evCoef").value = ev.coef;
   }
   $("elevesVide").style.display = c ? "none" : "block";
+  const prepAff = c ? M.preparerEleves(elevesActifs(c)) : [];
   $("eleves").innerHTML = !c ? "" : c.eleves.map((e, i) => `<tr class="${e.parti ? "parti" : ""}">
-    <td>${esc(e.cle)}${e.parti ? ` <span class="alias">(plus dans la liste)</span>` : ""}${e.alias.length ? `<div class="alias">entendu comme : ${e.alias.map(a => "« " + esc(a) + " »").join(", ")}</div>` : ""}</td>
+    <td>${esc(e.cle)}${e.parti ? ` <span class="alias">(plus dans la liste)</span>` : ""}${prepAff.find(p => p.cle === e.cle)?.aApprendre ? ` <span class="non" style="font-size:13px">à apprendre</span>` : ""}${e.alias.length ? `<div class="alias">entendu comme : ${e.alias.map(a => "« " + esc(a) + " »").join(", ")}</div>` : ""}</td>
     <td class="n">${ev && ev.notes[e.cle] !== undefined ? esc(M.formater(ev.notes[e.cle])) : "—"}</td>
     <td style="text-align:right;white-space:nowrap">${e.parti ? "" : `<button data-app="${i}">Apprendre</button>${e.alias.length ? ` <button data-oubli="${i}" aria-label="Oublier">✕</button>` : ""}`}</td></tr>`).join("");
   $("trimestre").value = etat.trimestre;
@@ -482,7 +483,7 @@ function finirApprendre(t) {
   const c = classe(); const e = c && c.eleves.find(x => x.cle === apprendreCle);
   quitterApprendre();
   if (!e) return;
-  if (!e.alias.includes(t)) e.alias = [...e.alias, t].slice(-3);
+  e.alias = [t];   // remplace l'ancien apprentissage (évite d'accumuler des mots parasites)
   sauver(); afficher();
   journal(t, `<span class="ok">${esc(e.cle)} appris : « ${esc(t)} »</span>`, null);
   parler(`${nomVoix(e.cle)} appris`);
@@ -563,7 +564,7 @@ $("changerColonne").addEventListener("click", () => {
   $("bilan").textContent = "Choisis le fichier, puis touche la bonne colonne. Les listes d'élèves seront remplacées.";
   $("fichier").click();
 });
-function importerAvec(titre) {
+async function importerAvec(titre) {
   $("choixColonne").style.display = "none";
   const remplacer = !!etat.colonne && etat.colonne.toLowerCase() !== titre.toLowerCase();
   changerCol = false;
@@ -572,9 +573,15 @@ function importerAvec(titre) {
   if (!listes.length) { $("bilan").textContent = `Aucune feuille ne contient la colonne « ${titre} ».`; return; }
   etat.colonne = titre;
   const bilan = D.fusionner(etat, listes, $("trimestre").value, remplacer);
-  sauver(); afficher();
+  sauver();
+  const lexOk = await lexiquePret;
+  afficher();
+  const aApprendre = lexOk ? etat.classes.map(c => ({ nom: c.nom, liste: M.preparerEleves(elevesActifs(c)).filter(p => p.aApprendre).map(p => p.cle) })).filter(x => x.liste.length) : [];
   const txt = bilan.map(b => `${b.nom} : ${b.eleves} élèves${b.nouvelle ? "" : `${b.ajoutes ? `, ${b.ajoutes} nouveau(x)` : ""}${b.partis ? `, ${b.partis} plus dans la liste` : ""}`}${b.doublons.length ? ` (en double, ignoré : ${b.doublons.join(", ")})` : ""}`);
   if (ignorees.length) txt.push(`Feuilles ignorées (pas de colonne « ${titre} ») : ${ignorees.join(", ")}`);
+  if (!lexOk) txt.push("Vérification des prénoms indisponible (connexion ?)");
+  else if (!aApprendre.length) txt.push("Tous les prénoms sont connus du modèle");
+  else aApprendre.forEach(x => txt.push(`${x.nom} : ${x.liste.length} prénom(s) à apprendre : ${x.liste.join(", ")}`));
   $("bilan").innerHTML = `Import fait (colonne « ${esc(titre)} »)${remplacer ? ", listes remplacées : les notes saisies avec l'ancienne colonne ne sont plus rattachées à un élève" : ""}. ${txt.map(esc).join(" · ")}<br>Tu peux supprimer le fichier reçu si tu n'en as plus besoin.`;
   journal("", `<span class="ok">Import : ${listes.length} classe(s)</span>`, null);
 }
@@ -692,6 +699,21 @@ $("testVoix").addEventListener("click", () => {
 if ("speechSynthesis" in window) speechSynthesis.getVoices();
 document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible" && mode !== "arret") navigator.wakeLock?.request("screen").then(v => verrou = v).catch(() => {}); });
 try { navigator.storage?.persist?.(); } catch (e) {}
+
+// ---------- Lexique du modèle (pour repérer les prénoms à apprendre) ----------
+const lexiquePret = (async () => {
+  try {
+    const r = await fetch("mots_modele.txt.gz");
+    if (!r.ok) throw new Error(r.status);
+    let octets = new Uint8Array(await r.arrayBuffer());
+    if (octets[0] === 0x1f && octets[1] === 0x8b) {
+      octets = new Uint8Array(await new Response(new Blob([octets]).stream().pipeThrough(new DecompressionStream("gzip"))).arrayBuffer());
+    }
+    M.definirLexique(new Set(new TextDecoder().decode(octets).split("\n")));
+    afficher();
+    return true;
+  } catch (e) { return false; }
+})();
 
 afficher();
 

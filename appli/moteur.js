@@ -167,13 +167,15 @@
     for (const e of eleves) { const p = normaliser(decouperCle(e.cle).prenom); parPrenom[p] = (parPrenom[p] || 0) + 1; }
     const res = eleves.map(e => {
       const { prenom, initiale } = decouperCle(e.cle);
-      const p = mots(prenom);
+      const mp = motsPrenom(prenom);
+      const p = mp.mots;
       const homonyme = parPrenom[normaliser(prenom)] > 1;
       const formes = [];
       if (!homonyme) formes.push(p);
       if (initiale && LETTRES[initiale]) for (const l of LETTRES[initiale]) formes.push([...p, ...l.split(" ")]);
       for (const a of e.alias || []) { const m = mots(a); if (m.length) formes.push(m); }
-      return { cle: e.cle, prenom, formes, homonyme, alias: e.alias || [] };
+      const aApprendre = mp.inconnu && !(e.alias || []).length;
+      return { cle: e.cle, prenom, formes, homonyme, alias: e.alias || [], aApprendre };
     });
     // Mots propres d'un alias (« van » pour « et van ») : suffisent s'ils n'appartiennent qu'à lui.
     const base = new Set([...MOTS_NOMBRES, ...MOTS_NOTES, ...MOTS_COMMANDES]);
@@ -191,8 +193,26 @@
   // Prénoms partagés : on les reconnaît seuls pour pouvoir dire « précise l'initiale ».
   function prenomsHomonymes(prep) {
     const s = {};
-    for (const e of prep) if (e.homonyme) s[normaliser(e.prenom)] = mots(e.prenom);
+    for (const e of prep) if (e.homonyme) s[normaliser(e.prenom)] = motsPrenom(e.prenom).mots;
     return Object.values(s);
+  }
+
+  // ---------- Lexique du modèle ----------
+  // Liste des mots connus du modèle Vosk (chargée par la page). Sert à repérer les prénoms inconnus.
+  let lexique = null;
+  function definirLexique(set) { lexique = set; }
+  function sansAccent(m) { return m.normalize("NFD").replace(/[\u0300-\u036f]/g, "").normalize("NFC"); }
+  // Mots du prénom tels que le modèle peut les entendre. inconnu = true si un mot reste inconnu.
+  function motsPrenom(prenom) {
+    const res = [];
+    let inconnu = false;
+    for (const m of mots(prenom)) {
+      if (!lexique || lexique.has(m)) { res.push(m); continue; }
+      const s = sansAccent(m);
+      if (lexique.has(s)) { res.push(s); continue; }   // « évan » inconnu, « evan » connu
+      res.push(m); inconnu = true;
+    }
+    return { mots: res, inconnu };
   }
 
   function correspond(t, i, f) { return f.every((m, k) => t[i + k] === m); }
@@ -227,7 +247,8 @@
 
   // ---------- Grammaires pour Vosk ----------
   function grammaireNotes(prep, bareme, classes) {
-    const s = new Set([...MOTS_NOTES, ...MOTS_COMMANDES, ...motsJusqua(Math.max(10, bareme)), "cent", "vingts"]);
+    // « cent » et « vingts » seulement si le barème le demande : sinon ils captent des mots mal entendus.
+    const s = new Set([...MOTS_NOTES, ...MOTS_COMMANDES, ...motsJusqua(Math.max(10, bareme))]);
     prep.forEach(e => e.formes.forEach(f => f.forEach(m => s.add(m))));
     prenomsHomonymes(prep).forEach(f => f.forEach(m => s.add(m)));
     classes.forEach(c => formesClasse(c).forEach(f => f.forEach(m => s.add(m))));
@@ -319,6 +340,6 @@
   root.Moteur = {
     normaliser, mots, entierA, noteA, enMots, motsJusqua, lireBareme, lireCoef, lireOuiNon,
     decouperCle, preparerEleves, formesClasse, analyser, formater, pourVoix,
-    grammaireNotes, grammaireNavigation, grammaireDialogue
+    grammaireNotes, grammaireNavigation, grammaireDialogue, definirLexique, sansAccent
   };
 })(typeof window !== "undefined" ? window : globalThis);
