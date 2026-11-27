@@ -10,121 +10,177 @@
 <link rel="icon" href="icone-192.png">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <style>
-:root{color-scheme:light dark;--bg:light-dark(#f6f6f3,#16181b);--carte:light-dark(#fff,#202327);--ink:light-dark(#1b1d20,#ecedee);--doux:light-dark(#62666d,#9aa0a8);--trait:light-dark(#dcdcd6,#33373d);--ok:light-dark(#1d7a45,#4cc282);--non:light-dark(#b3261e,#ff8a80);--accent:light-dark(#1f4fd1,#7aa2ff);--choisi:light-dark(#e6edff,#26324f)}
+:root{color-scheme:light dark;--bg:light-dark(#f6f6f3,#16181b);--carte:light-dark(#fff,#202327);--ink:light-dark(#1b1d20,#ecedee);--doux:light-dark(#62666d,#9aa0a8);--trait:light-dark(#dcdcd6,#33373d);--ok:light-dark(#1d7a45,#4cc282);--non:light-dark(#b3261e,#ff8a80);--accent:light-dark(#1f4fd1,#7aa2ff);--choisi:light-dark(#e6edff,#26324f);--rouge-clair:light-dark(#fde9e7,#3d2120);--gris-clair:light-dark(#ececea,#2c2f34);--surligne:light-dark(#fff1c2,#4a3f14)}
 *{box-sizing:border-box;min-width:0}
-body{margin:0;background:var(--bg);color:var(--ink);font:17px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
-main{max-width:640px;margin:0 auto;padding:16px 16px 48px}
-h1{font-size:26px;line-height:1.15;margin:4px 0 4px}
-h2{font-size:18px;margin:28px 0 8px}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.4 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+main{max-width:640px;margin:0 auto;padding:10px 10px 40px}
+h2{font-size:18px;margin:22px 0 8px}
 .petit{font-size:14px;color:var(--doux)}
-.carte{background:var(--carte);border:1px solid var(--trait);border-radius:14px;padding:14px 16px;margin-top:12px}
-button{font:inherit;min-height:44px;padding:8px 16px;border-radius:10px;border:1px solid var(--trait);background:var(--carte);color:var(--ink);cursor:pointer}
+.carte{background:var(--carte);border:1px solid var(--trait);border-radius:12px;padding:10px 12px;margin-top:10px}
+button{font:inherit;min-height:44px;padding:8px 14px;border-radius:10px;border:1px solid var(--trait);background:var(--carte);color:var(--ink);cursor:pointer}
 button:focus-visible,input:focus-visible,select:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
 button:disabled{opacity:.45;cursor:default}
-#go{width:100%;min-height:64px;font-size:20px;font-weight:600;background:var(--accent);color:#fff;border:0;margin-top:14px}
-#go.stop{background:var(--non)}
-#envoyer{display:none;width:100%;min-height:64px;font-size:20px;font-weight:600;background:var(--ok);color:#fff;border:0;margin-top:12px}
+button[aria-pressed=true]{background:var(--choisi);border-color:var(--accent);color:var(--accent);font-weight:600}
 .danger{color:var(--non);border-color:var(--non)}
+.ok{color:var(--ok);font-weight:600}.non{color:var(--non);font-weight:600}
+svg.ic{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;vertical-align:middle}
+#statut{font-size:13px;color:var(--doux);margin:0 2px 8px}
 #etat{font-weight:600}
-#entendu{min-height:1.5em;color:var(--doux);font-style:italic}
-#derniere{font-size:36px;font-weight:700;line-height:1.1;min-height:1.1em;margin-top:6px}
-#bandeau{display:none;background:var(--accent);color:#fff;border-radius:10px;padding:12px 14px;margin-top:12px;font-weight:600}
-.ctx{font-size:18px;font-weight:600}
-ol{list-style:none;margin:0;padding:0}
+/* Classes */
+#zoneClasses{display:flex;gap:6px;align-items:stretch}
+#classes{flex:1;display:grid;gap:6px}
+#classes button{padding:10px 2px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#ouvrirReglages{padding:0 10px}
+/* Évaluations */
+#evals{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}
+#evals button{font-size:14px;min-height:40px;padding:6px 10px;max-width:100%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#ligneEval{display:none;align-items:center;gap:6px;margin-top:10px;background:var(--carte);border:1px solid var(--trait);border-radius:10px;padding:4px 6px 4px 10px;font-size:14px;color:var(--doux)}
+#ligneEval input{font:inherit;color:var(--ink);background:transparent;border:1px solid transparent;border-bottom:1px dashed var(--trait);border-radius:6px;padding:6px 4px}
+#ligneEval input:focus{border-color:var(--accent);background:var(--carte)}
+#evDesc{flex:1;font-weight:600!important;font-size:16px!important}
+#evBareme,#evCoef{width:3.4em;text-align:center;font-weight:600}
+#evSuppr{min-height:40px;padding:4px 8px;border-color:transparent;background:transparent;color:var(--doux)}
+#evSuppr.arme{color:#fff;background:var(--non);font-size:13px}
+/* Commandes */
+#commandes{display:grid;grid-template-columns:62px minmax(0,1.15fr) minmax(0,1fr);gap:8px;margin-top:10px}
+#reglageVoix{display:flex;flex-direction:column;align-items:center;gap:4px;font-size:13px;color:var(--doux)}
+#reglageVoix label{display:flex;flex-direction:column;align-items:center;gap:2px;margin:0}
+#volume{writing-mode:vertical-lr;direction:rtl;height:84px;width:30px;margin:0}
+#go{border-radius:14px;font-size:17px;font-weight:600;line-height:1.25;padding:10px 6px;min-height:132px;background:var(--choisi);color:var(--accent);border:2px solid var(--accent)}
+#go .sous{display:block;font-size:13px;font-weight:400;margin-top:4px}
+#go.ecoute{background:var(--rouge-clair);color:var(--non);border-color:var(--non)}
+#go.pause{background:var(--gris-clair);color:var(--doux);border-color:var(--doux)}
+#go.ecoute svg{animation:pouls 1.2s ease-in-out infinite}
+@keyframes pouls{50%{transform:scale(1.25);opacity:.55}}
+#colDroite{display:flex;flex-direction:column;gap:8px}
+.boite{background:var(--carte);border:1px solid var(--trait);border-radius:10px;padding:6px 8px}
+#boiteEntendu{flex:1}
+#entendu{min-height:2.6em;font-style:italic;font-size:14px;overflow-wrap:anywhere}
+#compteur{text-align:center;font-size:14px;color:var(--doux)}
+#compteur b{font-size:22px;color:var(--ink)}
+#bandeau{display:none;background:var(--accent);color:#fff;border-radius:10px;padding:10px 12px;margin-top:10px;font-weight:600}
+#envoyer{display:none;width:100%;min-height:56px;font-size:18px;font-weight:600;background:var(--ok);color:#fff;border:0;margin-top:10px}
+/* Élèves */
+#eleves{columns:2;column-gap:12px;margin-top:10px;background:var(--carte);border:1px solid var(--trait);border-radius:12px;padding:2px 6px}
+.el{display:flex;align-items:center;gap:2px;break-inside:avoid;border-bottom:1px solid var(--trait);padding:1px 0 1px 4px;border-radius:6px;scroll-margin:12px}
+.el .nom{flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.el .note{width:2.6em;text-align:right;font-weight:700;white-space:nowrap}
+.el .note.vide{color:var(--doux);font-weight:400}
+.el button{min-height:38px;width:36px;padding:0;border:0;background:transparent;color:var(--doux)}
+.el button.appris{color:var(--accent)}
+.el.inconnu .nom::after{content:" ●";color:var(--non)}
+.el.inconnu button{color:var(--non)}
+.el.dernier{background:var(--surligne)}
+.el.parti{color:var(--doux)}
+.el.parti .nom{font-style:italic}
+#exporter{width:100%;margin-top:12px;min-height:52px;font-weight:600}
+/* Réglages */
+#reglages{display:none}
+#reglages label{display:flex;gap:10px;align-items:center;margin:8px 0}
+input[type=text],select{font:inherit;padding:6px 8px;border-radius:8px;border:1px solid var(--trait);background:var(--carte);color:var(--ink)}
+.ligne{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.choix{display:flex;flex-wrap:wrap;gap:8px}
+ol,ul.liste{list-style:none;margin:0;padding:0}
+ul.liste li{display:flex;align-items:center;gap:8px;border-top:1px solid var(--trait);padding:4px 0}
+ul.liste li:first-child{border-top:0}
+ul.liste li span{flex:1}
 #journal li{border-top:1px solid var(--trait);padding:8px 0}
 #journal li:first-child{border-top:0}
 .brut{font-size:14px;color:var(--doux)}
-.ok{color:var(--ok);font-weight:600}.non{color:var(--non);font-weight:600}
 .lat{font-size:13px;color:var(--doux);white-space:nowrap}
-table{width:100%;border-collapse:collapse;font-size:16px}
-td{padding:6px 4px;border-top:1px solid var(--trait);vertical-align:middle}
-td.n{text-align:right;font-weight:700;white-space:nowrap;width:4.5em}
-td button{min-height:36px;padding:4px 10px;font-size:14px}
-tr.parti td{color:var(--doux)}
-.alias{font-size:13px;color:var(--doux)}
-label{display:flex;gap:10px;align-items:center;margin:8px 0}
-input[type=number],input[type=text],select{font:inherit;padding:6px 8px;border-radius:8px;border:1px solid var(--trait);background:var(--carte);color:var(--ink)}
-input[type=number]{width:6em}
-input[type=text]{flex:1}
-.ligne{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
-.choix{display:flex;flex-wrap:wrap;gap:8px}
-.choix button[aria-pressed=true]{background:var(--choisi);border-color:var(--accent);font-weight:600}
-.evals button{display:block;width:100%;text-align:left;margin-top:8px}
 .aide li{margin:4px 0}
 </style>
 </head>
 <body>
 <main>
-<h1>Dictée des notes</h1>
-<p class="petit">La reconnaissance se fait dans le téléphone. Rien n'est envoyé : les listes et les notes restent dans ce navigateur. Exporte à chaque arrêt.</p>
+<!-- Écran principal -->
+<div id="principal">
+  <div id="statut"><span id="etat">chargement…</span> · <span id="info">Première fois : environ 42 Mo à télécharger (en wifi).</span></div>
 
-<div class="carte">
-  <div>État : <span id="etat">chargement…</span></div>
-  <div class="petit" id="info">Première fois : environ 42 Mo à télécharger (en wifi). Ensuite, tout reste dans le téléphone.</div>
-  <button id="go" disabled>Démarrer l'écoute</button>
-  <div class="ligne" style="margin-top:10px"><label style="margin:0"><input type="checkbox" id="voix"> Répéter à voix haute</label><button id="testVoix">Tester la voix</button></div>
-  <label style="margin-top:6px">Volume de la voix <input type="range" id="volume" min="10" max="100" step="10" style="flex:1"> <span id="volVal" class="petit"></span></label>
+  <div id="zoneClasses">
+    <div id="classes"></div>
+    <button id="ouvrirReglages" aria-label="Réglages"><svg class="ic" viewBox="0 0 24 24"><path d="M10.3 4.3c.4-1.8 3-1.8 3.4 0a1.7 1.7 0 0 0 2.6 1.1c1.5-.9 3.3.8 2.4 2.4a1.7 1.7 0 0 0 1 2.5c1.8.5 1.8 3 0 3.5a1.7 1.7 0 0 0-1 2.5c.9 1.6-.9 3.3-2.4 2.4a1.7 1.7 0 0 0-2.6 1.1c-.4 1.8-3 1.8-3.4 0a1.7 1.7 0 0 0-2.6-1.1c-1.5.9-3.3-.8-2.4-2.4a1.7 1.7 0 0 0-1-2.5c-1.8-.5-1.8-3 0-3.5a1.7 1.7 0 0 0 1-2.5c-.9-1.6.9-3.3 2.4-2.4a1.7 1.7 0 0 0 2.6-1.1z"/><circle cx="12" cy="12" r="3"/></svg></button>
+  </div>
+
+  <div id="evals"></div>
+
+  <div id="ligneEval">
+    <input type="text" id="evDesc" aria-label="Description de l'évaluation">
+    sur <input type="number" id="evBareme" min="1" max="100" step="1" inputmode="numeric" aria-label="Barème">
+    coef <input type="number" id="evCoef" min="0.1" max="10" step="0.1" inputmode="decimal" aria-label="Coefficient">
+    <button id="evSuppr" aria-label="Supprimer l'évaluation"><svg class="ic" viewBox="0 0 24 24"><path d="M4 7h16M10 11v6M14 11v6M5 7l1 12a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2l1-12M9 7V4h6v3"/></svg></button>
+  </div>
+
+  <div id="commandes">
+    <div id="reglageVoix">
+      <label><input type="checkbox" id="voix"> Répéter</label>
+      <input type="range" id="volume" min="10" max="100" step="10" aria-label="Volume de la voix">
+      <span>Vol <span id="volVal"></span></span>
+    </div>
+    <button id="go" disabled>Chargement…</button>
+    <div id="colDroite">
+      <div class="boite" id="boiteEntendu"><div class="petit">J'entends</div><div id="entendu"></div></div>
+      <div class="boite" id="compteur"></div>
+    </div>
+  </div>
   <div id="bandeau"></div>
   <button id="envoyer">Envoyer le fichier</button>
-</div>
 
-<div class="carte">
-  <div class="petit">Classe et évaluation :</div>
-  <div class="ctx" id="ctx">Aucune classe choisie</div>
-  <div class="petit" style="margin-top:10px">J'entends :</div>
-  <div id="entendu"></div>
-  <div class="petit" style="margin-top:10px">Dernière note :</div>
-  <div id="derniere"></div>
-</div>
+  <div id="eleves"></div>
 
-<h2>Classes</h2>
-<div class="carte"><div class="choix" id="classes"><span class="petit">Aucune classe : importe le fichier du trimestre (en bas de page).</span></div></div>
-
-<h2>Évaluations</h2>
-<div class="carte">
-  <div class="evals" id="evals"><span class="petit">Choisis d'abord une classe.</span></div>
-  <div id="editEval" style="display:none;margin-top:14px;border-top:1px solid var(--trait);padding-top:10px">
-    <div class="petit">Évaluation choisie (modifiable) :</div>
-    <label>Description <input type="text" id="evDesc"></label>
-    <div class="ligne"><label>Sur <input type="number" id="evBareme" min="1" max="100" step="1"></label><label>Coef <input type="number" id="evCoef" min="0.1" max="10" step="0.1"></label></div>
-    <button id="evSuppr" class="danger">Supprimer cette évaluation</button>
-  </div>
-  <button id="nouvelleEval" style="margin-top:12px" disabled>+ Nouvelle évaluation</button>
-</div>
-
-<h2>Élèves</h2>
-<div class="carte"><table><tbody id="eleves"></tbody></table><div class="petit" id="elevesVide">Choisis une classe.</div></div>
-
-<h2>Fichiers</h2>
-<div class="carte">
-  <label>Trimestre <select id="trimestre"><option>T1</option><option>T2</option><option>T3</option></select></label>
-  <div class="ligne"><button id="importer">Importer le fichier du trimestre</button><input type="file" id="fichier" accept=".xlsx,.xls,.ods" hidden></div>
-  <div class="ligne petit" style="margin-top:8px"><span id="colonneActuelle"></span><button id="changerColonne" style="display:none">Changer de colonne</button></div>
-  <div id="choixColonne" style="display:none;margin-top:10px">
-    <div class="petit">Touche la colonne prénom + initiale :</div>
-    <div class="choix" id="colonnes" style="margin-top:6px"></div>
-  </div>
-  <div class="petit" id="bilan" style="margin-top:8px"></div>
-  <div class="ligne" style="margin-top:12px"><button id="exporter">Exporter et envoyer</button><button id="exporterXlsx">Télécharger en Excel</button></div>
+  <button id="exporter">Exporter et envoyer</button>
   <div class="petit" id="msgExport"></div>
-  <div class="ligne" style="margin-top:16px"><button id="nouveauTrim" class="danger">Nouveau trimestre</button></div>
-  <div class="petit">Efface les évaluations et les notes. Garde les classes, les élèves et les prénoms appris.</div>
 </div>
 
-<h2>Ce qu'on peut dire</h2>
-<div class="carte"><ul class="aide petit">
-  <li><b>Classe</b> : « classe cinquième bé »</li>
-  <li><b>Évaluation</b> : « nouvelle évaluation », « évaluation deux », « dernière évaluation », « liste des évaluations »</li>
-  <li><b>Notes</b> : « Emma douze », « Maxime treize virgule vingt-cinq » ou « treize et quart », « quinze et demi », « seize trois quarts », « Léo bé quatorze » (homonymes), « absent », « non rendu », « non noté »</li>
-  <li><b>Corrections</b> : « annule » (dernière note), « remplace » (après « a déjà… »)</li>
-  <li><b>Autres</b> : « manquants », « pause » puis « reprends », « exporter »</li>
-</ul></div>
+<!-- Réglages -->
+<div id="reglages">
+  <div class="ligne"><button id="fermerReglages">← Retour</button><h2 style="margin:0">Réglages</h2></div>
 
-<h2>Journal</h2>
-<div class="ligne"><button id="copier">Copier le journal</button><span class="petit" id="msgCopie"></span></div>
-<div class="carte"><ol id="journal"><li class="petit">Rien pour l'instant.</li></ol></div>
+  <h2>Liste des élèves</h2>
+  <div class="carte">
+    <label>Trimestre <select id="trimestre"><option>T1</option><option>T2</option><option>T3</option></select></label>
+    <div class="ligne"><button id="importer">Importer la liste des élèves</button><input type="file" id="fichier" accept=".csv,text/csv,text/comma-separated-values,text/plain,.xlsx,.xls,.ods" hidden></div>
+    <div class="petit" style="margin-top:6px">Fichier CSV : la première ligne donne les classes, chaque colonne la liste des pseudos. Réimporter garde les notes déjà saisies.</div>
+    <div class="ligne petit" style="margin-top:8px"><span id="colonneActuelle"></span><button id="changerColonne" style="display:none">Changer de colonne</button></div>
+    <div id="choixColonne" style="display:none;margin-top:10px">
+      <div class="petit">Touche la colonne des pseudos :</div>
+      <div class="choix" id="colonnes" style="margin-top:6px"></div>
+    </div>
+    <div class="petit" id="bilan" style="margin-top:8px"></div>
+  </div>
 
-<p class="petit" style="margin-top:28px">Reconnaissance : Vosk (vosk-browser 0.0.8), modèle vosk-model-small-fr-0.22 d'Alpha Cephei, licence Apache 2.0. Fichiers Excel : SheetJS Community Edition, licence Apache 2.0.</p>
+  <h2>Prénoms appris</h2>
+  <div class="carte"><ul class="liste" id="appris"></ul></div>
+
+  <h2>Voix</h2>
+  <div class="carte"><button id="testVoix">Tester la voix</button></div>
+
+  <h2>Classes</h2>
+  <div class="carte"><ul class="liste" id="listeClasses"></ul><div class="petit" style="margin-top:6px">Supprimer une classe efface aussi ses notes (deux appuis).</div></div>
+
+  <h2>Fichiers</h2>
+  <div class="carte">
+    <button id="exporterXlsx">Télécharger en Excel (secours)</button>
+    <div class="petit" id="msgXlsx"></div>
+    <div class="ligne" style="margin-top:14px"><button id="nouveauTrim" class="danger">Nouveau trimestre</button></div>
+    <div class="petit">Efface les évaluations et les notes. Garde les classes, les élèves et les prénoms appris.</div>
+  </div>
+
+  <h2>Ce qu'on peut dire</h2>
+  <div class="carte"><ul class="aide petit">
+    <li><b>Classe</b> : « classe cinquième quatre »</li>
+    <li><b>Évaluation</b> : « nouvelle évaluation », « évaluation deux », « dernière évaluation », « liste des évaluations »</li>
+    <li><b>Notes</b> : « Emma douze », « Maxime treize virgule vingt-cinq » ou « treize et quart », « quinze et demi », « seize trois quarts », « Zoé a quatorze » (initiale), « absent », « non rendu », « non noté »</li>
+    <li><b>Corrections</b> : « annule » (dernière note), « remplace » (après « a déjà… »)</li>
+    <li><b>Autres</b> : « manquants », « pause » puis « reprends », « exporter »</li>
+  </ul></div>
+
+  <h2>Journal</h2>
+  <div class="ligne"><button id="copier">Copier le journal</button><span class="petit" id="msgCopie"></span></div>
+  <div class="carte"><ol id="journal"><li class="petit">Rien pour l'instant.</li></ol></div>
+
+  <p class="petit" style="margin-top:28px">Reconnaissance : Vosk (vosk-browser 0.0.8), modèle vosk-model-small-fr-0.22 d'Alpha Cephei, licence Apache 2.0. Fichiers Excel : SheetJS Community Edition, licence Apache 2.0.</p>
+</div>
 </main>
 
 <script src="https://cdn.jsdelivr.net/npm/vosk-browser@0.0.8/dist/vosk.js"></script>
@@ -155,10 +211,24 @@ let dernierPartiel = "", tChangement = 0, attente = null, enAttenteRemplace = nu
 let fichierPret = null;      // { blob, nom }
 let classeurImporte = null;
 const historique = [];       // pour « annule »
+let dernier = null;          // { ev: id, cle } : dernière note saisie, surlignée dans la liste
+let aDefiler = false;        // vrai juste après une nouvelle note : la liste va la montrer
 const lignes = [];
 
 function esc(s) { return String(s).replace(/[&<>"']/g, c => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[c])); }
-function setEtat(t) { $("etat").textContent = t; }
+function setEtat(t) { $("etat").textContent = t; majGo(); }
+const ICONE_MICRO = `<svg class="ic" viewBox="0 0 24 24" style="width:30px;height:30px"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg>`;
+const ICONE_OREILLE = `<svg class="ic" viewBox="0 0 24 24"><path d="M6 10a7 7 0 1 1 13 3.6a10 10 0 0 1-2 2a8 8 0 0 0-2 3a4.5 4.5 0 0 1-6.8 1.4"/><path d="M10 10a3 3 0 1 1 5 2.2"/></svg>`;
+// Bouton d'écoute : trois aspects (arrêtée, en cours, en pause).
+function majGo() {
+  const b = $("go");
+  b.classList.toggle("ecoute", mode === "ecoute" || mode === "dlg" || mode === "apprendre");
+  b.classList.toggle("pause", mode === "pause");
+  if (!model) { b.innerHTML = `${ICONE_MICRO}<br>Chargement…`; return; }
+  if (mode === "arret") b.innerHTML = `${ICONE_MICRO}<br>Démarrer l'écoute`;
+  else if (mode === "pause") b.innerHTML = `${ICONE_MICRO}<br>En pause<span class="sous">dis « reprends »</span>`;
+  else b.innerHTML = `${ICONE_MICRO}<br>Écoute en cours<span class="sous">toucher pour arrêter</span>`;
+}
 function bandeau(t) { $("bandeau").style.display = t ? "block" : "none"; $("bandeau").textContent = t || ""; }
 
 // ---------- Contexte courant ----------
@@ -172,33 +242,51 @@ function coefVoix(c) { return String(c).replace(".", " virgule "); }
 // ---------- Affichage ----------
 function afficher() {
   const c = classe(), ev = evaluation();
-  $("ctx").textContent = !c ? "Aucune classe choisie" : !ev ? `${c.nom} · aucune évaluation choisie` : `${c.nom} · ${numeroEval(c, ev)}. ${ev.desc} · /${M.formater(ev.bareme)} · coef ${M.formater(ev.coef)}`;
+  // Classes : 5 par ligne au plus.
+  $("classes").style.gridTemplateColumns = `repeat(${Math.max(1, Math.min(5, etat.classes.length))}, minmax(0, 1fr))`;
   $("classes").innerHTML = etat.classes.length ? etat.classes.map((x, i) => `<button data-classe="${i}" aria-pressed="${x === c}">${esc(x.nom)}</button>`).join("")
-    : `<span class="petit">Aucune classe : importe le fichier du trimestre (en bas de page).</span>`;
-  $("nouvelleEval").disabled = !c;
-  if (!c) $("evals").innerHTML = `<span class="petit">Choisis d'abord une classe.</span>`;
-  else if (!c.evals.length) $("evals").innerHTML = `<span class="petit">Aucune évaluation. Dis « nouvelle évaluation » ou touche le bouton.</span>`;
-  else {
-    const n = elevesActifs(c).length;
-    $("evals").innerHTML = c.evals.map((e, i) => {
-      const faits = elevesActifs(c).filter(x => e.notes[x.cle] !== undefined).length;
-      return `<button data-eval="${e.id}" aria-pressed="${e === ev}">${i + 1}. ${esc(e.desc)} · /${esc(M.formater(e.bareme))} · coef ${esc(M.formater(e.coef))} · ${faits}/${n}</button>`;
-    }).join("");
-    $("evals").querySelectorAll("button").forEach(b => b.setAttribute("aria-pressed", String(ev && b.dataset.eval == ev.id)));
-  }
-  $("editEval").style.display = ev ? "block" : "none";
-  if (ev && document.activeElement?.closest?.("#editEval") == null) {
+    : `<span class="petit">Aucune classe : touche la roue dentée, puis « Importer la liste des élèves ».</span>`;
+  // Évaluations de la classe
+  if (!c) $("evals").innerHTML = etat.classes.length ? `<span class="petit">Choisis une classe (ou dis « classe … »).</span>` : "";
+  else $("evals").innerHTML = c.evals.map(e => `<button data-eval="${e.id}" aria-pressed="${e === ev}">${esc(e.desc)}</button>`).join("")
+    + `<button data-nouvelle="1">+ Nouvelle éval</button>`;
+  // Évaluation choisie : description, barème, coefficient, corbeille
+  $("ligneEval").style.display = ev ? "flex" : "none";
+  if (ev && document.activeElement?.closest?.("#ligneEval") == null) {
     $("evDesc").value = ev.desc; $("evBareme").value = ev.bareme; $("evCoef").value = ev.coef;
   }
-  $("elevesVide").style.display = c ? "none" : "block";
-  const prepAff = c ? M.preparerEleves(elevesActifs(c)) : [];
-  $("eleves").innerHTML = !c ? "" : c.eleves.map((e, i) => `<tr class="${e.parti ? "parti" : ""}">
-    <td>${esc(e.cle)}${e.parti ? ` <span class="alias">(plus dans la liste)</span>` : ""}${prepAff.find(p => p.cle === e.cle)?.aApprendre ? ` <span class="non" style="font-size:13px">à apprendre</span>` : ""}${e.alias.length ? `<div class="alias">entendu comme : ${e.alias.map(a => "« " + esc(a) + " »").join(", ")}</div>` : ""}</td>
-    <td class="n">${ev && ev.notes[e.cle] !== undefined ? esc(M.formater(ev.notes[e.cle])) : "—"}</td>
-    <td style="text-align:right;white-space:nowrap">${e.parti ? "" : `<button data-app="${i}">Apprendre</button>${e.alias.length ? ` <button data-oubli="${i}" aria-label="Oublier">✕</button>` : ""}`}</td></tr>`).join("");
+  // Compteur
+  const actifs = c ? elevesActifs(c) : [];
+  $("compteur").innerHTML = !c ? "Aucune classe" : !ev ? `${actifs.length} élèves<br>choisis une éval`
+    : `<b>${actifs.filter(e => ev.notes[e.cle] !== undefined).length}</b> / ${actifs.length}<br>corrigées`;
+  // Élèves et notes (deux colonnes, lues de haut en bas)
+  const prepAff = c ? M.preparerEleves(actifs) : [];
+  $("eleves").style.display = c ? "" : "none";
+  $("eleves").innerHTML = !c ? "" : c.eleves.map((e, i) => {
+    const v = ev ? ev.notes[e.cle] : undefined;
+    const inconnu = !e.parti && prepAff.find(p => p.cle === e.cle)?.aApprendre;
+    const estDernier = dernier && ev && dernier.ev === ev.id && dernier.cle === e.cle;
+    return `<div class="el${e.parti ? " parti" : ""}${inconnu ? " inconnu" : ""}${estDernier ? " dernier" : ""}" data-i="${i}">
+      <span class="nom" title="${esc(e.cle)}${e.parti ? " (plus dans la liste)" : ""}">${esc(e.cle)}</span>
+      <span class="note${v === undefined ? " vide" : ""}">${v === undefined ? "—" : esc(M.formater(v))}</span>
+      ${e.parti ? `<span style="width:36px"></span>` : `<button data-app="${i}" class="${e.alias.length ? "appris" : ""}" aria-label="Apprendre ${esc(e.cle)}">${ICONE_OREILLE}</button>`}
+    </div>`;
+  }).join("");
+  if (aDefiler) {
+    aDefiler = false;
+    const d = $("eleves").querySelector(".el.dernier");
+    if (d) d.scrollIntoView({ block: "nearest", behavior: "smooth" });
+  }
+  // Réglages
   $("trimestre").value = etat.trimestre;
-  $("colonneActuelle").textContent = etat.colonne ? `Colonne des élèves : « ${etat.colonne} »` : "";
-  $("changerColonne").style.display = etat.colonne ? "" : "none";
+  $("colonneActuelle").textContent = etat.colonne === "CSV" ? "Liste importée depuis un fichier CSV." : etat.colonne ? `Colonne des élèves : « ${etat.colonne} »` : "";
+  $("changerColonne").style.display = etat.colonne && etat.colonne !== "CSV" ? "" : "none";
+  const appris = etat.classes.flatMap(x => x.eleves.map((e, i) => ({ x, e, i }))).filter(o => o.e.alias.length);
+  $("appris").innerHTML = appris.length ? appris.map(o => `<li><span>${esc(o.x.nom)} · ${esc(o.e.cle)} : ${o.e.alias.map(a => "« " + esc(a) + " »").join(", ")}</span><button data-oubli="${esc(o.x.nom)}|${o.i}" aria-label="Oublier">✕</button></li>`).join("")
+    : `<li class="petit">Aucun pour l'instant. Touche l'oreille à côté d'un élève pour lui apprendre son prénom.</li>`;
+  $("listeClasses").innerHTML = etat.classes.map((x, i) => `<li><span>${esc(x.nom)} · ${elevesActifs(x).length} élèves · ${x.evals.length} éval.</span><button class="danger" data-suppr="${i}">Supprimer</button></li>`).join("")
+    || `<li class="petit">Aucune classe.</li>`;
+  majGo();
   majRec();
 }
 
@@ -344,7 +432,7 @@ function appliquer(ev, cle, valeur) {
   ev.notes[cle] = valeur;
   etat.modifie = true;
   sauver();
-  $("derniere").textContent = `${cle} : ${M.formater(valeur)}`;
+  dernier = { ev: ev.id, cle }; aDefiler = true;
 }
 
 function commande(a, t, lat) {
@@ -358,7 +446,7 @@ function commande(a, t, lat) {
       const d = historique.pop();
       if (!d) return non("Rien à annuler", "rien à annuler");
       if (d.avant === undefined) delete d.ev.notes[d.cle]; else d.ev.notes[d.cle] = d.avant;
-      sauver(); $("derniere").textContent = "";
+      sauver(); dernier = { ev: d.ev.id, cle: d.cle }; aDefiler = true;
       return ok(`Annulé : ${d.cle}`, "annulé");
     }
     case "remplace": {
@@ -405,7 +493,7 @@ function commande(a, t, lat) {
 function choisirClasse(x) {
   etat.courant.classe = x ? x.nom : null;
   etat.courant.eval = null;
-  historique.length = 0;
+  historique.length = 0; dernier = null;
   sauver();
 }
 
@@ -514,8 +602,7 @@ async function demarrer() {
     mode = "ecoute";
     setEtat("écoute");
     parler("écoute démarrée");
-    $("go").textContent = "Arrêter l'écoute";
-    $("go").classList.add("stop");
+    majGo();
   } catch (e) {
     setEtat("micro refusé ou indisponible");
     $("info").textContent = "Autorise le micro pour ce site dans Chrome, puis recharge la page.";
@@ -534,29 +621,31 @@ function arreter() {
   rec = recLibre = noeud = flux = ctxAudio = verrou = null; signature = "";
   setEtat("arrêté");
   $("entendu").textContent = "";
-  $("go").textContent = "Démarrer l'écoute";
-  $("go").classList.remove("stop");
+  majGo();
   if (etat.modifie) bandeau("Pense à exporter : des notes n'ont pas encore été envoyées.");
 }
 
 // ---------- Import ----------
-$("importer").addEventListener("click", () => {
-  if (!window.XLSX) { $("bilan").textContent = "Bibliothèque Excel non chargée : vérifie la connexion et recharge la page."; return; }
-  $("fichier").click();
-});
+$("importer").addEventListener("click", () => { $("bilan").textContent = ""; $("fichier").click(); });
 $("fichier").addEventListener("change", async () => {
   const f = $("fichier").files[0];
   $("fichier").value = "";
   if (!f) return;
-  try {
-    classeurImporte = XLSX.read(await f.arrayBuffer());
-  } catch (e) { $("bilan").textContent = "Fichier illisible."; return; }
+  let octets;
+  try { octets = new Uint8Array(await f.arrayBuffer()); } catch (e) { $("bilan").textContent = "Fichier illisible."; return; }
+  // Liste CSV (une colonne par classe) : lue directement, sans choix de colonne.
+  if (D.estCsv(f.name, octets) && !changerCol) {
+    const { listes, ignorees } = D.listesCsv(D.decoderTexte(octets));
+    if (!listes.length) { $("bilan").textContent = "Aucune classe trouvée : la première ligne doit contenir les noms des classes, et chaque colonne les pseudos."; return; }
+    return terminerImport(listes, ignorees, "CSV", false);
+  }
+  if (!window.XLSX) { $("bilan").textContent = "Bibliothèque Excel non chargée : vérifie la connexion et recharge la page."; return; }
+  try { classeurImporte = XLSX.read(octets); } catch (e) { $("bilan").textContent = "Fichier illisible."; return; }
   const { titres } = D.titresColonnes(classeurImporte);
-  if (etat.colonne && !changerCol && titres.some(x => x.toLowerCase() === etat.colonne.toLowerCase())) return importerAvec(etat.colonne);
+  if (etat.colonne && etat.colonne !== "CSV" && !changerCol && titres.some(x => x.toLowerCase() === etat.colonne.toLowerCase())) return importerAvec(etat.colonne);
   $("colonnes").innerHTML = titres.map((x, i) => `<button data-col="${i}">${esc(x)}</button>`).join("") || `<span class="petit">Aucun titre de colonne trouvé dans la première feuille.</span>`;
   $("colonnes").dataset.titres = JSON.stringify(titres);
   $("choixColonne").style.display = "block";
-  $("bilan").textContent = "";
 });
 $("colonnes").addEventListener("click", ev => {
   const b = ev.target.closest("button"); if (!b) return;
@@ -565,28 +654,35 @@ $("colonnes").addEventListener("click", ev => {
 let changerCol = false;
 $("changerColonne").addEventListener("click", () => {
   changerCol = true;
-  $("bilan").textContent = "Choisis le fichier, puis touche la bonne colonne. Les listes d'élèves seront remplacées.";
+  $("bilan").textContent = "Choisis le fichier Excel, puis touche la bonne colonne. Les listes d'élèves seront remplacées.";
   $("fichier").click();
 });
-async function importerAvec(titre) {
+function importerAvec(titre) {
   $("choixColonne").style.display = "none";
-  const remplacer = !!etat.colonne && etat.colonne.toLowerCase() !== titre.toLowerCase();
+  const remplacer = !!etat.colonne && etat.colonne !== "CSV" && etat.colonne.toLowerCase() !== titre.toLowerCase();
   changerCol = false;
   const { listes, ignorees } = D.extraireListes(classeurImporte, titre);
   classeurImporte = null;
   if (!listes.length) { $("bilan").textContent = `Aucune feuille ne contient la colonne « ${titre} ».`; return; }
-  etat.colonne = titre;
+  return terminerImport(listes, ignorees, titre, remplacer);
+}
+async function terminerImport(listes, ignorees, source, remplacer) {
+  etat.colonne = source;
   const bilan = D.fusionner(etat, listes, $("trimestre").value, remplacer);
+  dernier = null;
   sauver();
+  if (model) $("info").textContent = "Démarre, puis dis « classe … ».";
   const lexOk = await lexiquePret;
   afficher();
   const aApprendre = lexOk ? etat.classes.map(c => ({ nom: c.nom, liste: M.preparerEleves(elevesActifs(c)).filter(p => p.aApprendre).map(p => p.cle) })).filter(x => x.liste.length) : [];
-  const txt = bilan.map(b => `${b.nom} : ${b.eleves} élèves${b.nouvelle ? "" : `${b.ajoutes ? `, ${b.ajoutes} nouveau(x)` : ""}${b.partis ? `, ${b.partis} plus dans la liste` : ""}`}${b.doublons.length ? ` (en double, ignoré : ${b.doublons.join(", ")})` : ""}`);
-  if (ignorees.length) txt.push(`Feuilles ignorées (pas de colonne « ${titre} ») : ${ignorees.join(", ")}`);
+  const txt = bilan.map(b => `${b.nom} : ${b.eleves} élèves${b.nouvelle ? "" : `${b.ajoutes ? `, ${b.ajoutes} nouveau(x)` : ""}${b.partis ? `, ${b.partis} plus dans la liste (gardé(s) pour leurs notes)` : ""}${b.retires ? `, ${b.retires} retiré(s)` : ""}`}${b.doublons.length ? ` (en double, ignoré : ${b.doublons.join(", ")})` : ""}`);
+  if (bilan.retirees.length) txt.push(`Classes retirées (absentes du fichier, sans notes) : ${bilan.retirees.join(", ")}`);
+  if (bilan.gardees.length) txt.push(`Classes absentes du fichier mais gardées car elles ont des notes : ${bilan.gardees.join(", ")} (supprimables plus bas)`);
+  if (ignorees.length) txt.push(`Ignoré (aucun élève) : ${ignorees.join(", ")}`);
   if (!lexOk) txt.push("Vérification des prénoms indisponible (connexion ?)");
   else if (!aApprendre.length) txt.push("Tous les prénoms sont connus du modèle");
-  else aApprendre.forEach(x => txt.push(`${x.nom} : ${x.liste.length} prénom(s) à apprendre : ${x.liste.join(", ")}`));
-  $("bilan").innerHTML = `Import fait (colonne « ${esc(titre)} »)${remplacer ? ", listes remplacées : les notes saisies avec l'ancienne colonne ne sont plus rattachées à un élève" : ""}. ${txt.map(esc).join(" · ")}<br>Tu peux supprimer le fichier reçu si tu n'en as plus besoin.`;
+  else aApprendre.forEach(x => txt.push(`${x.nom} : ${x.liste.length} prénom(s) à apprendre (point rouge) : ${x.liste.join(", ")}`));
+  $("bilan").innerHTML = `<b>Import fait.</b>${remplacer ? " Listes remplacées : les notes saisies avec l'ancienne colonne ne sont plus rattachées à un élève." : ""}<br>${txt.map(esc).join("<br>")}<br>Tu peux supprimer le fichier reçu du téléphone.`;
   journal("", `<span class="ok">Import : ${listes.length} classe(s)</span>`, null);
 }
 $("trimestre").addEventListener("change", () => { etat.trimestre = $("trimestre").value; sauver(); });
@@ -629,15 +725,15 @@ function reussi(comment) {
 $("envoyer").addEventListener("click", envoyer);
 $("exporter").addEventListener("click", () => { if (preparerExport()) envoyer(); });
 $("exporterXlsx").addEventListener("click", () => {
-  if (!window.XLSX) { $("msgExport").textContent = "Bibliothèque Excel non chargée : vérifie la connexion et recharge la page."; return; }
-  if (!etat.classes.length) { $("msgExport").textContent = "Rien à exporter."; return; }
+  if (!window.XLSX) { $("msgXlsx").textContent = "Bibliothèque Excel non chargée : vérifie la connexion et recharge la page."; return; }
+  if (!etat.classes.length) { $("msgXlsx").textContent = "Rien à exporter."; return; }
   const data = XLSX.write(D.construireClasseur(etat), { type: "array", bookType: "xlsx" });
   const nom = D.nomFichier(etat);
   const a = document.createElement("a");
   a.href = URL.createObjectURL(new Blob([data], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" })); a.download = nom;
   document.body.appendChild(a); a.click(); a.remove();
   setTimeout(() => URL.revokeObjectURL(a.href), 10000);
-  $("msgExport").textContent = `${nom} enregistré dans Téléchargements.`;
+  $("msgXlsx").textContent = `${nom} enregistré dans Téléchargements.`;
 });
 
 // ---------- Nouveau trimestre (deux appuis) ----------
@@ -662,36 +758,70 @@ $("classes").addEventListener("click", ev => {
 });
 $("evals").addEventListener("click", ev => {
   const b = ev.target.closest("button"); if (!b) return;
-  etat.courant.eval = +b.dataset.eval; historique.length = 0; sauver(); afficher();
+  if (b.dataset.nouvelle) {
+    const c = classe(); if (!c) return;
+    if (mode === "ecoute") { journal("", `<span class="ok">Nouvelle évaluation (bouton)</span>`, null); return debutDialogue(); }
+    creerEval(c, `Évaluation ${c.evals.length + 1}`, 20, 1); dernier = null; return afficher();
+  }
+  etat.courant.eval = +b.dataset.eval; historique.length = 0; dernier = null; sauver(); afficher();
 });
-$("nouvelleEval").addEventListener("click", () => {
-  const c = classe(); if (!c) return;
-  if (mode === "ecoute") { journal("", `<span class="ok">Nouvelle évaluation (bouton)</span>`, null); return debutDialogue(); }
-  creerEval(c, `Évaluation ${c.evals.length + 1}`, 20, 1); afficher();
-});
-$("evDesc").addEventListener("change", () => { const ev = evaluation(); if (ev && $("evDesc").value.trim()) { ev.desc = $("evDesc").value.trim(); etat.modifie = true; sauver(); afficher(); } });
+$("evDesc").addEventListener("change", () => { const ev = evaluation(); if (ev && $("evDesc").value.trim()) { ev.desc = $("evDesc").value.trim(); etat.modifie = true; sauver(); } afficher(); });
 $("evBareme").addEventListener("change", () => { const ev = evaluation(); const v = Math.round(+$("evBareme").value); if (ev && v >= 1 && v <= 100) { ev.bareme = v; etat.modifie = true; sauver(); } afficher(); });
 $("evCoef").addEventListener("change", () => { const ev = evaluation(); const v = Math.round(+$("evCoef").value * 10) / 10; if (ev && v >= 0.1 && v <= 10) { ev.coef = v; etat.modifie = true; sauver(); } afficher(); });
+["evDesc", "evBareme", "evCoef"].forEach(id => $(id).addEventListener("keydown", e => { if (e.key === "Enter") e.target.blur(); }));
+const CORBEILLE = $("evSuppr").innerHTML;
 let armeSuppr = null;
+function desarmerSuppr() { clearTimeout(armeSuppr); armeSuppr = null; $("evSuppr").innerHTML = CORBEILLE; $("evSuppr").classList.remove("arme"); }
 $("evSuppr").addEventListener("click", () => {
   const c = classe(), ev = evaluation(); if (!ev) return;
-  if (!armeSuppr) { $("evSuppr").textContent = "Toucher encore pour supprimer (notes comprises)"; armeSuppr = setTimeout(() => { armeSuppr = null; $("evSuppr").textContent = "Supprimer cette évaluation"; }, 5000); return; }
-  clearTimeout(armeSuppr); armeSuppr = null; $("evSuppr").textContent = "Supprimer cette évaluation";
-  c.evals = c.evals.filter(e => e !== ev); etat.courant.eval = null; etat.modifie = true; historique.length = 0;
+  if (!armeSuppr) { $("evSuppr").textContent = "Supprimer ?"; $("evSuppr").classList.add("arme"); armeSuppr = setTimeout(desarmerSuppr, 5000); return; }
+  desarmerSuppr();
+  c.evals = c.evals.filter(e => e !== ev); etat.courant.eval = null; etat.modifie = true; historique.length = 0; dernier = null;
+  journal("", `<span class="ok">Évaluation supprimée : ${esc(ev.desc)}</span>`, null);
   sauver(); afficher();
 });
 $("eleves").addEventListener("click", ev => {
   const b = ev.target.closest("button"); if (!b) return;
   if (b.dataset.app !== undefined) apprendre(+b.dataset.app);
-  if (b.dataset.oubli !== undefined) { classe().eleves[+b.dataset.oubli].alias = []; sauver(); afficher(); }
 });
+$("appris").addEventListener("click", ev => {
+  const b = ev.target.closest("button[data-oubli]"); if (!b) return;
+  const [nom, i] = b.dataset.oubli.split("|");
+  const c = etat.classes.find(x => x.nom === nom);
+  if (c && c.eleves[+i]) { c.eleves[+i].alias = []; sauver(); afficher(); }
+});
+let armeClasse = null;
+$("listeClasses").addEventListener("click", ev => {
+  const b = ev.target.closest("button[data-suppr]"); if (!b) return;
+  const x = etat.classes[+b.dataset.suppr]; if (!x) return;
+  if (armeClasse?.x !== x) {
+    clearTimeout(armeClasse?.t);
+    afficher();
+    const b2 = $("listeClasses").querySelector(`button[data-suppr="${b.dataset.suppr}"]`);
+    b2.textContent = "Toucher encore pour supprimer";
+    armeClasse = { x, t: setTimeout(() => { armeClasse = null; afficher(); }, 5000) };
+    return;
+  }
+  clearTimeout(armeClasse.t); armeClasse = null;
+  etat.classes = etat.classes.filter(k => k !== x);
+  if (etat.courant.classe === x.nom) choisirClasse(null);
+  etat.modifie = true; sauver(); afficher();
+  journal("", `<span class="ok">Classe supprimée : ${esc(x.nom)}</span>`, null);
+});
+function montrerReglages(oui) {
+  $("principal").style.display = oui ? "none" : "";
+  $("reglages").style.display = oui ? "block" : "none";
+  window.scrollTo(0, 0);
+}
+$("ouvrirReglages").addEventListener("click", () => montrerReglages(true));
+$("fermerReglages").addEventListener("click", () => montrerReglages(false));
 $("copier").addEventListener("click", async () => {
   const txt = lignes.join("\n") || "(journal vide)";
   try { await navigator.clipboard.writeText(txt); $("msgCopie").textContent = "Copié."; } catch (e) { $("msgCopie").textContent = "Copie refusée par le navigateur."; }
 });
 $("go").addEventListener("click", () => { mode === "arret" ? demarrer() : arreter(); });
 $("voix").checked = voix;
-$("volume").value = volume; $("volVal").textContent = volume + " %";
+$("volume").value = volume; $("volVal").textContent = "";
 $("volume").addEventListener("input", () => { volume = +$("volume").value; $("volVal").textContent = volume + " %"; });
 $("volume").addEventListener("change", () => { ecrire("appli.volume", volume); parler("Maxime, douze", true); });
 $("voix").addEventListener("change", () => { voix = $("voix").checked; ecrire("appli.voix", voix); });
@@ -729,8 +859,9 @@ const lent = setTimeout(() => { if (!model) $("info").textContent = "Toujours en
     model = await Vosk.createModel(MODELE);
     clearTimeout(lent);
     setEtat("prêt");
-    $("info").textContent = etat.classes.length ? "Démarre, puis dis « classe … »." : "Importe d'abord le fichier du trimestre (en bas de page).";
+    $("info").textContent = etat.classes.length ? "Démarre, puis dis « classe … »." : "Importe d'abord la liste des élèves (roue dentée).";
     $("go").disabled = false;
+    majGo();
   } catch (e) {
     setEtat("échec du chargement du modèle");
     $("info").textContent = "Vérifie la connexion et recharge la page.";

@@ -49,17 +49,76 @@
     return { listes, ignorees };
   }
 
+  // ---------- Fichier CSV de pseudos ----------
+  // Format : ligne 1 = noms des classes (une colonne par classe), puis un pseudo par case.
+  // Point-virgule (ou virgule, ou tabulation), UTF-8 avec ou sans BOM ; à défaut Windows-1252.
+  function decoderTexte(octets) {
+    let t = new TextDecoder("utf-8").decode(octets);
+    if (t.includes("�")) { try { t = new TextDecoder("windows-1252").decode(octets); } catch (e) {} }
+    return t.replace(/^﻿/, "");
+  }
+  function decouperCsv(t) {
+    const premiere = t.split(/\r?\n/)[0] || "";
+    const nb = s => premiere.split(s).length - 1;
+    const sep = [";", "\t", ","].reduce((a, b) => nb(b) > nb(a) ? b : a, ";");
+    const L = []; let ligne = [], cel = "", guill = false;
+    for (let i = 0; i < t.length; i++) {
+      const ch = t[i];
+      if (guill) {
+        if (ch === '"') { if (t[i + 1] === '"') { cel += '"'; i++; } else guill = false; }
+        else cel += ch;
+      } else if (ch === '"' && cel === "") guill = true;
+      else if (ch === sep) { ligne.push(cel); cel = ""; }
+      else if (ch === "\n" || ch === "\r") {
+        if (ch === "\r" && t[i + 1] === "\n") i++;
+        ligne.push(cel); L.push(ligne); ligne = []; cel = "";
+      } else cel += ch;
+    }
+    if (cel !== "" || ligne.length) { ligne.push(cel); L.push(ligne); }
+    return L;
+  }
+  // Renvoie { listes: [{ nom, cles, doublons }], ignorees: [] } comme extraireListes.
+  function listesCsv(texteCsv) {
+    const L = decouperCsv(texteCsv).filter(l => l.some(c => texte(c)));
+    if (!L.length) return { listes: [], ignorees: [] };
+    const tete = L[0].map(texte);
+    const listes = [], ignorees = [];
+    tete.forEach((nom, j) => {
+      if (!nom) return;
+      const cles = [], vus = new Set(), doublons = [];
+      for (let i = 1; i < L.length; i++) {
+        const v = texte(L[i][j]);
+        if (!v) continue;
+        if (vus.has(norm(v))) { doublons.push(v); continue; }
+        vus.add(norm(v)); cles.push(v);
+      }
+      if (cles.length) listes.push({ nom, cles, doublons }); else ignorees.push(nom);
+    });
+    return { listes, ignorees };
+  }
+  function estCsv(nomFichier, octets) {
+    if (/\.(csv|txt)$/i.test(nomFichier || "")) return true;
+    // Un .xlsx commence par « PK » (zip) ; un ancien .xls par D0 CF.
+    return !(octets[0] === 0x50 && octets[1] === 0x4b) && !(octets[0] === 0xd0 && octets[1] === 0xcf);
+  }
+
+  function aDesNotes(c, cle) { return c.evals.some(ev => ev.notes && ev.notes[cle] !== undefined); }
+
   // Fusionne les listes importées dans l'état. Classes reconnues par leur nom, élèves par leur clé.
-  // Les notes déjà saisies sont gardées. Un élève absent de la nouvelle liste est marqué « parti »
-  // (gardé en fin de liste, pour ne perdre aucune note).
+  // Les notes déjà saisies sont gardées. Un élève absent de la nouvelle liste est gardé en fin
+  // de liste (« parti ») seulement s'il a au moins une note ; sinon il est retiré.
+  // Une classe absente du fichier est retirée si elle n'a aucune note, sinon gardée (en fin).
+  // Les classes suivent l'ordre du fichier.
   // remplacer = true : nouvelle colonne, on repart des listes du fichier (sans « partis »).
   function fusionner(etat, listes, trimestre, remplacer) {
     const bilan = [];
     if (trimestre) etat.trimestre = trimestre;
+    const ordre = [];
     for (const l of listes) {
       let c = etat.classes.find(x => norm(x.nom) === norm(l.nom));
       const nouvelle = !c;
       if (!c) { c = { nom: l.nom, eleves: [], evals: [] }; etat.classes.push(c); }
+      ordre.push(c);
       const anciens = new Map((remplacer ? [] : c.eleves).map(e => [norm(e.cle), e]));
       const eleves = l.cles.map(cle => {
         const a = anciens.get(norm(cle));
@@ -67,10 +126,17 @@
         return a ? { cle: a.cle, alias: a.alias || [] } : { cle, alias: [] };
       });
       const ajoutes = remplacer ? 0 : l.cles.filter(cle => !c.eleves.some(e => norm(e.cle) === norm(cle))).length;
-      const partis = [...anciens.values()].map(e => ({ ...e, parti: true }));
+      const restes = [...anciens.values()];
+      const partis = restes.filter(e => aDesNotes(c, e.cle)).map(e => ({ ...e, parti: true }));
       c.eleves = [...eleves, ...partis];
-      bilan.push({ nom: c.nom, nouvelle, eleves: eleves.length, ajoutes: nouvelle ? 0 : ajoutes, partis: partis.length, doublons: l.doublons });
+      bilan.push({ nom: c.nom, nouvelle, eleves: eleves.length, ajoutes: nouvelle ? 0 : ajoutes, partis: partis.length, retires: restes.length - partis.length, doublons: l.doublons });
     }
+    const absentes = etat.classes.filter(c => !ordre.includes(c));
+    const gardees = absentes.filter(c => c.eleves.some(e => aDesNotes(c, e.cle)));
+    etat.classes = [...ordre, ...gardees];
+    if (etat.courant && !etat.classes.some(c => c.nom === etat.courant.classe)) etat.courant = { classe: null, eval: null };
+    bilan.gardees = gardees.map(c => c.nom);
+    bilan.retirees = absentes.filter(c => !gardees.includes(c)).map(c => c.nom);
     return bilan;
   }
 
@@ -125,5 +191,5 @@
     return `notes_${etat.trimestre}_${d.getFullYear()}-${deux(d.getMonth() + 1)}-${deux(d.getDate())}_${deux(d.getHours())}${deux(d.getMinutes())}.${ext || "xlsx"}`;
   }
 
-  root.Donnees = { etatVide, titresColonnes, extraireListes, fusionner, construireClasseur, construireCsv, nomFichier, enteteEval };
+  root.Donnees = { etatVide, titresColonnes, extraireListes, fusionner, decoderTexte, decouperCsv, listesCsv, estCsv, aDesNotes, construireClasseur, construireCsv, nomFichier, enteteEval };
 })(typeof window !== "undefined" ? window : globalThis);

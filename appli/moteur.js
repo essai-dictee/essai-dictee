@@ -169,7 +169,9 @@
       const { prenom, initiale } = decouperCle(e.cle);
       const mp = motsPrenom(prenom);
       const p = mp.mots;
-      const homonyme = parPrenom[normaliser(prenom)] > 1;
+      // Homonyme aussi quand le pseudo porte déjà une initiale (« Looka B » / « Louka L ») :
+      // l'enseignante l'a ajoutée pour distinguer deux prénoms qui se prononcent pareil.
+      const homonyme = parPrenom[normaliser(prenom)] > 1 || !!(initiale && LETTRES[initiale]);
       const formes = [];
       if (!homonyme) formes.push(p);
       if (initiale && LETTRES[initiale]) for (const l of LETTRES[initiale]) formes.push([...p, ...l.split(" ")]);
