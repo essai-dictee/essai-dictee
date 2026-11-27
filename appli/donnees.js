@@ -101,11 +101,29 @@
     return wb;
   }
 
-  function deux(n) { return String(n).padStart(2, "0"); }
-  function nomFichier(etat, d) {
-    d = d || new Date();
-    return `notes_${etat.trimestre}_${d.getFullYear()}-${deux(d.getMonth() + 1)}-${deux(d.getDate())}_${deux(d.getHours())}${deux(d.getMinutes())}.xlsx`;
+  // Export CSV pour Excel en français : un seul fichier, un bloc par classe
+  // (ligne d'en-têtes « Classe;Clé;évaluations… », puis une ligne par élève, puis une ligne vide).
+  // Point-virgule, virgule décimale, UTF-8 avec BOM pour les accents.
+  function csvCellule(v) {
+    if (v === undefined || v === null) return "";
+    const s = typeof v === "number" ? String(v).replace(".", ",") : String(v);
+    return /[;"\r\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
+  }
+  function construireCsv(etat) {
+    const lignes = [];
+    for (const c of etat.classes) {
+      lignes.push(["Classe", "Clé", ...c.evals.map(enteteEval)].map(csvCellule).join(";"));
+      for (const e of c.eleves) lignes.push([c.nom, e.cle, ...c.evals.map(ev => ev.notes[e.cle])].map(csvCellule).join(";"));
+      lignes.push("");
+    }
+    return "\uFEFF" + lignes.join("\r\n");
   }
 
-  root.Donnees = { etatVide, titresColonnes, extraireListes, fusionner, construireClasseur, nomFichier, enteteEval };
+  function deux(n) { return String(n).padStart(2, "0"); }
+  function nomFichier(etat, d, ext) {
+    d = d || new Date();
+    return `notes_${etat.trimestre}_${d.getFullYear()}-${deux(d.getMonth() + 1)}-${deux(d.getDate())}_${deux(d.getHours())}${deux(d.getMinutes())}.${ext || "xlsx"}`;
+  }
+
+  root.Donnees = { etatVide, titresColonnes, extraireListes, fusionner, construireClasseur, construireCsv, nomFichier, enteteEval };
 })(typeof window !== "undefined" ? window : globalThis);

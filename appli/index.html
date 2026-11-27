@@ -59,6 +59,7 @@ input[type=text]{flex:1}
   <div class="petit" id="info">Première fois : environ 42 Mo à télécharger (en wifi). Ensuite, tout reste dans le téléphone.</div>
   <button id="go" disabled>Démarrer l'écoute</button>
   <div class="ligne" style="margin-top:10px"><label style="margin:0"><input type="checkbox" id="voix"> Répéter à voix haute</label><button id="testVoix">Tester la voix</button></div>
+  <label style="margin-top:6px">Volume de la voix <input type="range" id="volume" min="10" max="100" step="10" style="flex:1"> <span id="volVal" class="petit"></span></label>
   <div id="bandeau"></div>
   <button id="envoyer">Envoyer le fichier</button>
 </div>
@@ -100,7 +101,7 @@ input[type=text]{flex:1}
     <div class="choix" id="colonnes" style="margin-top:6px"></div>
   </div>
   <div class="petit" id="bilan" style="margin-top:8px"></div>
-  <div class="ligne" style="margin-top:12px"><button id="exporter">Exporter et envoyer</button></div>
+  <div class="ligne" style="margin-top:12px"><button id="exporter">Exporter et envoyer</button><button id="exporterXlsx">Télécharger en Excel</button></div>
   <div class="petit" id="msgExport"></div>
   <div class="ligne" style="margin-top:16px"><button id="nouveauTrim" class="danger">Nouveau trimestre</button></div>
   <div class="petit">Efface les évaluations et les notes. Garde les classes, les élèves et les prénoms appris.</div>
@@ -112,7 +113,7 @@ input[type=text]{flex:1}
   <li><b>Évaluation</b> : « nouvelle évaluation », « évaluation deux », « dernière évaluation », « liste des évaluations »</li>
   <li><b>Notes</b> : « Emma douze », « Maxime treize virgule vingt-cinq » ou « treize et quart », « quinze et demi », « seize trois quarts », « Léo bé quatorze » (homonymes), « absent », « non rendu », « non noté »</li>
   <li><b>Corrections</b> : « annule » (dernière note), « remplace » (après « a déjà… »)</li>
-  <li><b>Autres</b> : « qui manque », « pause » puis « reprends », « exporter »</li>
+  <li><b>Autres</b> : « manquants », « pause » puis « reprends », « exporter »</li>
 </ul></div>
 
 <h2>Journal</h2>
@@ -137,6 +138,7 @@ function lire(cle, def) { try { const v = localStorage.getItem(cle); return v ? 
 function ecrire(cle, v) { try { localStorage.setItem(cle, JSON.stringify(v)); return true; } catch (e) { return false; } }
 let etat = lire("appli.etat", null) || D.etatVide();
 let voix = lire("appli.voix", true);
+let volume = lire("appli.volume", 100);
 function sauver() { if (!ecrire("appli.etat", etat)) journal("", `<span class="non">Enregistrement impossible dans le téléphone : exporte tout de suite</span>`, null); }
 
 // ---------- Variables ----------
@@ -223,6 +225,7 @@ function parler(texte, force, apres) {
   const u = new SpeechSynthesisUtterance(texte);
   u.lang = "fr-FR";
   const v = voixFr(); if (v) u.voice = v;
+  u.volume = Math.min(1, Math.max(0.1, volume / 100));
   u.onend = () => { clearTimeout(securite); setTimeout(() => { muet = false; fin(); }, 250); };
   u.onerror = e => { clearTimeout(securite); muet = false; fin(); if (e.error !== "interrupted" && e.error !== "canceled") journal("", `<span class="non">Voix : erreur « ${esc(e.error)} » en disant « ${esc(texte)} »</span>`, null); };
   const lancer = () => { speechSynthesis.resume(); speechSynthesis.speak(u); };
@@ -360,7 +363,7 @@ function commande(a, t, lat) {
       appliquer(r.ev, r.cle, r.valeur);
       return ok(`${r.cle} : ${M.formater(r.valeur)} (remplacé)`, `${nomVoix(r.cle)}, ${M.pourVoix(r.valeur)}`);
     }
-    case "qui manque": {
+    case "manquants": {
       const ev = evaluation();
       if (!ev) return non("Aucune évaluation choisie", "choisis d'abord une évaluation");
       const manque = elevesActifs(c).filter(e => ev.notes[e.cle] === undefined);
@@ -579,11 +582,9 @@ $("trimestre").addEventListener("change", () => { etat.trimestre = $("trimestre"
 
 // ---------- Export ----------
 function preparerExport() {
-  if (!window.XLSX) { $("msgExport").textContent = "Bibliothèque Excel non chargée : vérifie la connexion et recharge la page."; return false; }
   if (!etat.classes.length) { $("msgExport").textContent = "Rien à exporter : importe d'abord les classes."; return false; }
-  const wb = D.construireClasseur(etat);
-  const data = XLSX.write(wb, { type: "array", bookType: "xlsx" });
-  fichierPret = { blob: new Blob([data], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" }), nom: D.nomFichier(etat) };
+  // CSV : seul format tableur que Chrome accepte de partager (menu de partage → Quick Share).
+  fichierPret = { blob: new Blob([D.construireCsv(etat)], { type: "text/csv" }), nom: D.nomFichier(etat, null, "csv") };
   $("envoyer").style.display = "block";
   $("envoyer").textContent = `Envoyer ${fichierPret.nom}`;
   $("msgExport").textContent = `Fichier prêt : ${fichierPret.nom} (${Math.ceil(fichierPret.blob.size / 1024)} Ko).`;
@@ -616,6 +617,17 @@ function reussi(comment) {
 }
 $("envoyer").addEventListener("click", envoyer);
 $("exporter").addEventListener("click", () => { if (preparerExport()) envoyer(); });
+$("exporterXlsx").addEventListener("click", () => {
+  if (!window.XLSX) { $("msgExport").textContent = "Bibliothèque Excel non chargée : vérifie la connexion et recharge la page."; return; }
+  if (!etat.classes.length) { $("msgExport").textContent = "Rien à exporter."; return; }
+  const data = XLSX.write(D.construireClasseur(etat), { type: "array", bookType: "xlsx" });
+  const nom = D.nomFichier(etat);
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(new Blob([data], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" })); a.download = nom;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 10000);
+  $("msgExport").textContent = `${nom} enregistré dans Téléchargements.`;
+});
 
 // ---------- Nouveau trimestre (deux appuis) ----------
 let armeTrim = null;
@@ -668,6 +680,9 @@ $("copier").addEventListener("click", async () => {
 });
 $("go").addEventListener("click", () => { mode === "arret" ? demarrer() : arreter(); });
 $("voix").checked = voix;
+$("volume").value = volume; $("volVal").textContent = volume + " %";
+$("volume").addEventListener("input", () => { volume = +$("volume").value; $("volVal").textContent = volume + " %"; });
+$("volume").addEventListener("change", () => { ecrire("appli.volume", volume); parler("Maxime, douze", true); });
 $("voix").addEventListener("change", () => { voix = $("voix").checked; ecrire("appli.voix", voix); });
 $("testVoix").addEventListener("click", () => {
   const v = "speechSynthesis" in window ? voixFr() : null;

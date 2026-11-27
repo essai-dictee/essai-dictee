@@ -27,7 +27,7 @@
     "4": [["quatrième"], ["quatre"]], "3": [["troisième"], ["trois"]]
   };
   const MOTS_NOTES = ["virgule", "et", "demi", "quart", "quarts", "absent", "absente", "non", "rendu", "noté"];
-  const MOTS_COMMANDES = ["annule", "pause", "reprends", "remplace", "qui", "manque", "exporter",
+  const MOTS_COMMANDES = ["annule", "pause", "reprends", "remplace", "manquants", "manquant", "exporter",
     "nouvelle", "évaluation", "dernière", "liste", "des", "évaluations", "classe"];
   const MOTS_DIALOGUE = ["sur", "coefficient", "oui", "non", "annule", "virgule", "et", "demi"];
 
@@ -255,7 +255,7 @@
     while (i < t.length) {
       const a = t[i], b = t[i + 1];
       // commandes à plusieurs mots
-      if (a === "qui" && b === "manque") { actions.push({ type: "commande", nom: "qui manque" }); i += 2; continue; }
+      if (a === "manquants" || a === "manquant") { actions.push({ type: "commande", nom: "manquants" }); i += 1; continue; }
       if (a === "nouvelle" && b === "évaluation") { actions.push({ type: "commande", nom: "nouvelle évaluation" }); i += 2; continue; }
       if (a === "liste" && b === "des" && t[i + 2] === "évaluations") { actions.push({ type: "commande", nom: "liste des évaluations" }); i += 3; continue; }
       if (a === "dernière" && b === "évaluation") { actions.push({ type: "commande", nom: "évaluation", arg: "dernière" }); i += 2; continue; }
