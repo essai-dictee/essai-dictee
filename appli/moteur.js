@@ -217,6 +217,52 @@
     return { mots: res, inconnu };
   }
 
+  // ---------- Prénoms qui se ressemblent à l'oral ----------
+  // Clé phonétique grossière du français (« Laurane » → « loran », « Loane » → « loan »).
+  function clePhon(prenom) {
+    let s = sansAccent(String(prenom).toLowerCase()).replace(/[^a-z]/g, "");
+    s = s.replace(/eau/g, "o").replace(/au/g, "o").replace(/ph/g, "f").replace(/th/g, "t").replace(/ch/g, "S")
+      .replace(/qu/g, "k").replace(/gu(?=[ei])/g, "g").replace(/c(?=[eiy])/g, "s").replace(/c/g, "k")
+      .replace(/y/g, "i").replace(/h/g, "").replace(/z/g, "s").replace(/(ai|ei)/g, "e").replace(/ou/g, "U")
+      .replace(/(.)\1+/g, "$1");
+    if (s.length > 3) s = s.replace(/e$/, "");
+    if (s.length > 3) s = s.replace(/[stdx]$/, "");
+    return s;
+  }
+  function distance(a, b) {
+    const d = Array.from({ length: a.length + 1 }, (_, i) => [i]);
+    for (let j = 1; j <= b.length; j++) d[0][j] = j;
+    for (let i = 1; i <= a.length; i++) for (let j = 1; j <= b.length; j++)
+      d[i][j] = Math.min(d[i - 1][j] + 1, d[i][j - 1] + 1, d[i - 1][j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1));
+    return d[a.length][b.length];
+  }
+  function sontProches(a, b) {
+    const ka = clePhon(a), kb = clePhon(b);
+    if (!ka || !kb) return false;
+    if (ka === kb) return true;
+    const voy = k => k.replace(/[^aeioU]/g, "");
+    // Rime : dernière voyelle et consonnes finales (« en » de Eden / Sélen) ; si le prénom finit
+    // par une voyelle, on ajoute la consonne d'avant (« na » de Nina ≠ « sa » de Lisa).
+    const rime = k => { const r = (k.match(/[aeioU]+[^aeioU]*$/) || [""])[0]; return /[^aeioU]$/.test(r) ? r : (k.match(/[^aeioU]?[aeioU]+$/) || [""])[0]; };
+    if (voy(ka) === voy(kb) && rime(ka) === rime(kb) && voy(ka).length >= 2 && Math.abs(ka.length - kb.length) <= 2) return true;
+    return Math.min(ka.length, kb.length) >= 4 && distance(ka, kb) <= 1;
+  }
+  // Paires d'élèves d'une classe dont les prénoms (ou mots appris) se ressemblent,
+  // sauf si l'initiale les distingue déjà. eleves : [{ cle, alias }] → [[cleA, cleB]]
+  function prenomsProches(eleves) {
+    const paires = [];
+    const formes = eleves.map(e => {
+      const d = decouperCle(e.cle);
+      return { cle: e.cle, initiale: d.initiale, dits: [d.prenom, ...(e.alias || [])] };
+    });
+    for (let i = 0; i < formes.length; i++) for (let j = i + 1; j < formes.length; j++) {
+      const a = formes[i], b = formes[j];
+      if (a.initiale && b.initiale) continue;
+      if (a.dits.some(x => b.dits.some(y => sontProches(x, y)))) paires.push([a.cle, b.cle]);
+    }
+    return paires;
+  }
+
   function correspond(t, i, f) { return f.every((m, k) => t[i + k] === m); }
   function eleveA(t, i, prep) {
     let best = null;
@@ -339,7 +385,17 @@
     return String(v).replace(".", " virgule ");
   }
 
+  // Note dite seule (« douze et demi », « absent ») : { valeur } ou { erreur }, sinon null.
+  function noteSeule(texte) {
+    const t = mots(texte);
+    if (!t.length) return null;
+    const n = noteA(t, 0);
+    if (!n || n.long !== t.length) return null;
+    return n.erreur ? { erreur: n.erreur } : { valeur: n.valeur };
+  }
+
   root.Moteur = {
+    noteSeule, clePhon, sontProches, prenomsProches,
     normaliser, mots, entierA, noteA, enMots, motsJusqua, lireBareme, lireCoef, lireOuiNon,
     decouperCle, preparerEleves, formesClasse, analyser, formater, pourVoix,
     grammaireNotes, grammaireNavigation, grammaireDialogue, definirLexique, sansAccent

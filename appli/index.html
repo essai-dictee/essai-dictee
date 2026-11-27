@@ -63,12 +63,15 @@ svg.ic{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:2;strok
 /* Élèves */
 #eleves{columns:2;column-gap:12px;margin-top:10px;background:var(--carte);border:1px solid var(--trait);border-radius:12px;padding:2px 6px}
 .el{display:flex;align-items:center;gap:2px;break-inside:avoid;border-bottom:1px solid var(--trait);padding:1px 0 1px 4px;border-radius:6px;scroll-margin:12px}
-.el .nom{flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.el .nom{flex:1;display:flex;flex-direction:column;line-height:1.2;padding:3px 0}
+.el .nom span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.el .nom .dit{font-size:12px;color:var(--doux)}
+.el.selection{outline:2px solid var(--accent);outline-offset:-2px;background:var(--choisi)}
 .el .note{width:2.6em;text-align:right;font-weight:700;white-space:nowrap}
 .el .note.vide{color:var(--doux);font-weight:400}
 .el button{min-height:38px;width:36px;padding:0;border:0;background:transparent;color:var(--doux)}
 .el button.appris{color:var(--accent)}
-.el.inconnu .nom::after{content:" ●";color:var(--non)}
+.el.inconnu .p::after{content:" ●";color:var(--non)}
 .el.inconnu button{color:var(--non)}
 .el.dernier{background:var(--surligne)}
 .el.parti{color:var(--doux)}
@@ -149,6 +152,9 @@ ul.liste li span{flex:1}
     <div class="petit" id="bilan" style="margin-top:8px"></div>
   </div>
 
+  <h2>Prénoms qui se ressemblent</h2>
+  <div class="carte"><ul class="liste" id="proches"></ul><div class="petit" style="margin-top:6px">Pour les distinguer : ajoute l'initiale du nom dans le fichier maître (« Eden B », « Sélen D »), puis réimporte la liste. Il faudra alors dire l'initiale.</div></div>
+
   <h2>Prénoms appris</h2>
   <div class="carte"><ul class="liste" id="appris"></ul></div>
 
@@ -171,6 +177,7 @@ ul.liste li span{flex:1}
     <li><b>Classe</b> : « classe cinquième quatre »</li>
     <li><b>Évaluation</b> : « nouvelle évaluation », « évaluation deux », « dernière évaluation », « liste des évaluations »</li>
     <li><b>Notes</b> : « Emma douze », « Maxime treize virgule vingt-cinq » ou « treize et quart », « quinze et demi », « seize trois quarts », « Zoé a quatorze » (initiale), « absent », « non rendu », « non noté »</li>
+    <li><b>Élève touché</b> : touche un nom (cadre bleu), puis dis seulement la note (« douze et demi »). L'appli répète « prénom, note ». Retoucher le nom annule.</li>
     <li><b>Corrections</b> : « annule » (dernière note), « remplace » (après « a déjà… »)</li>
     <li><b>Autres</b> : « manquants », « pause » puis « reprends », « exporter »</li>
   </ul></div>
@@ -212,7 +219,8 @@ let fichierPret = null;      // { blob, nom }
 let classeurImporte = null;
 const historique = [];       // pour « annule »
 let dernier = null;          // { ev: id, cle } : dernière note saisie, surlignée dans la liste
-let aDefiler = false;        // vrai juste après une nouvelle note : la liste va la montrer
+let aDefiler = false;
+let selection = null;        // clé de l'élève touché : la prochaine note dite seule lui revient        // vrai juste après une nouvelle note : la liste va la montrer
 const lignes = [];
 
 function esc(s) { return String(s).replace(/[&<>"']/g, c => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[c])); }
@@ -266,8 +274,8 @@ function afficher() {
     const v = ev ? ev.notes[e.cle] : undefined;
     const inconnu = !e.parti && prepAff.find(p => p.cle === e.cle)?.aApprendre;
     const estDernier = dernier && ev && dernier.ev === ev.id && dernier.cle === e.cle;
-    return `<div class="el${e.parti ? " parti" : ""}${inconnu ? " inconnu" : ""}${estDernier ? " dernier" : ""}" data-i="${i}">
-      <span class="nom" title="${esc(e.cle)}${e.parti ? " (plus dans la liste)" : ""}">${esc(e.cle)}</span>
+    return `<div class="el${e.parti ? " parti" : ""}${inconnu ? " inconnu" : ""}${estDernier ? " dernier" : ""}${selection === e.cle ? " selection" : ""}" data-i="${i}">
+      <span class="nom" title="${esc(e.cle)}${e.parti ? " (plus dans la liste)" : ""}"><span class="p">${esc(e.cle)}</span>${e.alias.length ? `<span class="dit">≈ ${e.alias.map(esc).join(", ")}</span>` : ""}</span>
       <span class="note${v === undefined ? " vide" : ""}">${v === undefined ? "—" : esc(M.formater(v))}</span>
       ${e.parti ? `<span style="width:36px"></span>` : `<button data-app="${i}" class="${e.alias.length ? "appris" : ""}" aria-label="Apprendre ${esc(e.cle)}">${ICONE_OREILLE}</button>`}
     </div>`;
@@ -281,6 +289,8 @@ function afficher() {
   $("trimestre").value = etat.trimestre;
   $("colonneActuelle").textContent = etat.colonne === "CSV" ? "Liste importée depuis un fichier CSV." : etat.colonne ? `Colonne des élèves : « ${etat.colonne} »` : "";
   $("changerColonne").style.display = etat.colonne && etat.colonne !== "CSV" ? "" : "none";
+  const proches = etat.classes.flatMap(x => M.prenomsProches(elevesActifs(x)).map(p => `${x.nom} : ${p[0]} / ${p[1]}`));
+  $("proches").innerHTML = proches.length ? proches.map(t => `<li><span>${esc(t)}</span></li>`).join("") : `<li class="petit">Aucune paire repérée.</li>`;
   const appris = etat.classes.flatMap(x => x.eleves.map((e, i) => ({ x, e, i }))).filter(o => o.e.alias.length);
   $("appris").innerHTML = appris.length ? appris.map(o => `<li><span>${esc(o.x.nom)} · ${esc(o.e.cle)} : ${o.e.alias.map(a => "« " + esc(a) + " »").join(", ")}</span><button data-oubli="${esc(o.x.nom)}|${o.i}" aria-label="Oublier">✕</button></li>`).join("")
     : `<li class="petit">Aucun pour l'instant. Touche l'oreille à côté d'un élève pour lui apprendre son prénom.</li>`;
@@ -374,6 +384,18 @@ function cible() { return (mode === "apprendre" || (mode === "dlg" && dlg && dlg
 function recevoir(t, lat) {
   if (attente) { clearTimeout(attente.minuterie); t = attente.texte + " " + t; attente = null; }
   const c = classe(), ev = evaluation();
+  if (selection && mode === "ecoute" && c && c.eleves.some(e => e.cle === selection && !e.parti)) {
+    const n = M.noteSeule(t);
+    if (n) {
+      const cle = selection;
+      if (!ev) { journal(t, `<span class="non">Ignoré : aucune évaluation choisie</span>`, lat); direRefus("aucune évaluation choisie"); }
+      else if (n.erreur) { journal(t, `<span class="non">Ignoré : ${esc(n.erreur)}</span>`, lat); direRefus(n.erreur); }
+      else if (typeof n.valeur === "number" && n.valeur > ev.bareme) { journal(t, `<span class="non">Ignoré : au-dessus du barème</span>`, lat); direRefus("au-dessus du barème"); }
+      else { selection = null; noter(cle, n.valeur, t, lat, true); }
+      afficher();
+      return;
+    }
+  }
   const actions = M.analyser(t, { prep: c ? M.preparerEleves(elevesActifs(c)) : [], bareme: ev ? ev.bareme : null, classes: etat.classes.map(x => x.nom) });
   // Même élève plusieurs fois dans la phrase (« Durand dix… Durand neuf et demi ») : seule la dernière note compte.
   const derniere = new Map();
@@ -408,7 +430,7 @@ function direRefus(raison) {
   dernierRefus = { texte: phrase, t: performance.now() };
   parler(phrase);
 }
-function noter(cle, valeur, t, lat) {
+function noter(cle, valeur, t, lat, confirmer) {
   const c = classe(), ev = evaluation();
   const avant = ev.notes[cle];
   if (avant !== undefined && avant !== valeur) {
@@ -423,8 +445,8 @@ function noter(cle, valeur, t, lat) {
     return;
   }
   appliquer(ev, cle, valeur);
-  journal(t, `<span class="ok">${esc(cle)} : ${esc(M.formater(valeur))}</span>`, lat);
-  parler(`${nomVoix(cle)}, ${M.pourVoix(valeur)}`);
+  journal(t, `<span class="ok">${esc(cle)} : ${esc(M.formater(valeur))}${confirmer ? " (élève touché)" : ""}</span>`, lat);
+  parler(`${nomVoix(cle)}, ${M.pourVoix(valeur)}`, !!confirmer);
 }
 function appliquer(ev, cle, valeur) {
   if (enAttenteRemplace && enAttenteRemplace.cle === cle) { clearTimeout(enAttenteRemplace.minuterie); enAttenteRemplace = null; }
@@ -493,7 +515,7 @@ function commande(a, t, lat) {
 function choisirClasse(x) {
   etat.courant.classe = x ? x.nom : null;
   etat.courant.eval = null;
-  historique.length = 0; dernier = null;
+  historique.length = 0; dernier = null; selection = null;
   sauver();
 }
 
@@ -578,7 +600,12 @@ function finirApprendre(t) {
   e.alias = [t];   // remplace l'ancien apprentissage (évite d'accumuler des mots parasites)
   sauver(); afficher();
   journal(t, `<span class="ok">${esc(e.cle)} appris : « ${esc(t)} »</span>`, null);
-  parler(`${nomVoix(e.cle)} appris`);
+  const proches = M.prenomsProches(elevesActifs(c)).filter(p => p.includes(e.cle)).map(p => p[0] === e.cle ? p[1] : p[0]);
+  if (proches.length) {
+    bandeau(`« ${t} » ressemble à ${proches.join(", ")} : risque de confusion. Touche l'élève avant de dicter, ou ajoute l'initiale dans le maître.`);
+    setTimeout(() => { if (mode === "ecoute" && $("bandeau").textContent.startsWith("« " + t)) bandeau(""); }, 12000);
+    parler(`${nomVoix(e.cle)} appris, mais ça ressemble à ${proches.map(nomVoix).join(", ")}`);
+  } else parler(`${nomVoix(e.cle)} appris`);
 }
 
 // ---------- Démarrer / arrêter ----------
@@ -678,6 +705,9 @@ async function terminerImport(listes, ignorees, source, remplacer) {
   const txt = bilan.map(b => `${b.nom} : ${b.eleves} élèves${b.nouvelle ? "" : `${b.ajoutes ? `, ${b.ajoutes} nouveau(x)` : ""}${b.partis ? `, ${b.partis} plus dans la liste (gardé(s) pour leurs notes)` : ""}${b.retires ? `, ${b.retires} retiré(s)` : ""}`}${b.doublons.length ? ` (en double, ignoré : ${b.doublons.join(", ")})` : ""}`);
   if (bilan.retirees.length) txt.push(`Classes retirées (absentes du fichier, sans notes) : ${bilan.retirees.join(", ")}`);
   if (bilan.gardees.length) txt.push(`Classes absentes du fichier mais gardées car elles ont des notes : ${bilan.gardees.join(", ")} (supprimables plus bas)`);
+  const proches = etat.classes.map(c => ({ nom: c.nom, p: M.prenomsProches(elevesActifs(c)) })).filter(x => x.p.length);
+  if (proches.length) txt.push(`Prénoms qui se ressemblent (ajoute l'initiale du nom dans le maître, puis réimporte) : ${proches.map(x => `${x.nom} : ${x.p.map(p => p.join(" / ")).join(", ")}`).join(" ; ")}`);
+  else txt.push("Aucun prénom trop proche repéré");
   if (ignorees.length) txt.push(`Ignoré (aucun élève) : ${ignorees.join(", ")}`);
   if (!lexOk) txt.push("Vérification des prénoms indisponible (connexion ?)");
   else if (!aApprendre.length) txt.push("Tous les prénoms sont connus du modèle");
@@ -781,8 +811,13 @@ $("evSuppr").addEventListener("click", () => {
   sauver(); afficher();
 });
 $("eleves").addEventListener("click", ev => {
-  const b = ev.target.closest("button"); if (!b) return;
-  if (b.dataset.app !== undefined) apprendre(+b.dataset.app);
+  const b = ev.target.closest("button");
+  if (b && b.dataset.app !== undefined) return apprendre(+b.dataset.app);
+  if (b) return;
+  const ligne = ev.target.closest(".el"); if (!ligne) return;
+  const e = classe()?.eleves[+ligne.dataset.i]; if (!e || e.parti) return;
+  selection = selection === e.cle ? null : e.cle;
+  afficher();
 });
 $("appris").addEventListener("click", ev => {
   const b = ev.target.closest("button[data-oubli]"); if (!b) return;
