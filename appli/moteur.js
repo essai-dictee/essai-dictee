@@ -130,12 +130,16 @@
     const e = entierA(t, i);
     if (!e) return null;
     let v = e.n, j = i + e.long;
+    // « un demi » = 0,5 ; « un et demi » = 1,5 ; « deux demi » = 2,5 (le « et » est souvent avalé)
+    if (e.n === 1 && e.long === 1 && (t[j] === "demi" || t[j] === "demie") && j + 1 === t.length) return 0.5;
+    // « zéro cinq » = 0,5 (le « virgule » est souvent avalé)
+    if (e.n === 0 && t[j] in UNITES && UNITES[t[j]] >= 1 && UNITES[t[j]] <= 9 && j + 1 === t.length) return UNITES[t[j]] / 10;
     if (t[j] === "virgule") {
       const d = petitA(t, j + 1, false);
       if (!d || d.n > 9) return null;
       v += d.n / 10; j += 2;
     } else if (t[j] === "et" && t[j + 1] === "demi") { v += 0.5; j += 2; }
-    else if (t[j] === "demi") { v += 0.5; j += 1; }
+    else if (t[j] === "demi" || t[j] === "demie") { v += 0.5; j += 1; }
     if (j !== t.length) return null;
     v = Math.round(v * 10) / 10;
     if (v < 0.1 || v > 10) return null;

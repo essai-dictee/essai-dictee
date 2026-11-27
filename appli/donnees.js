@@ -52,20 +52,21 @@
   // Fusionne les listes importées dans l'état. Classes reconnues par leur nom, élèves par leur clé.
   // Les notes déjà saisies sont gardées. Un élève absent de la nouvelle liste est marqué « parti »
   // (gardé en fin de liste, pour ne perdre aucune note).
-  function fusionner(etat, listes, trimestre) {
+  // remplacer = true : nouvelle colonne, on repart des listes du fichier (sans « partis »).
+  function fusionner(etat, listes, trimestre, remplacer) {
     const bilan = [];
     if (trimestre) etat.trimestre = trimestre;
     for (const l of listes) {
       let c = etat.classes.find(x => norm(x.nom) === norm(l.nom));
       const nouvelle = !c;
       if (!c) { c = { nom: l.nom, eleves: [], evals: [] }; etat.classes.push(c); }
-      const anciens = new Map(c.eleves.map(e => [norm(e.cle), e]));
+      const anciens = new Map((remplacer ? [] : c.eleves).map(e => [norm(e.cle), e]));
       const eleves = l.cles.map(cle => {
         const a = anciens.get(norm(cle));
         anciens.delete(norm(cle));
         return a ? { cle: a.cle, alias: a.alias || [] } : { cle, alias: [] };
       });
-      const ajoutes = l.cles.filter(cle => !c.eleves.some(e => norm(e.cle) === norm(cle))).length;
+      const ajoutes = remplacer ? 0 : l.cles.filter(cle => !c.eleves.some(e => norm(e.cle) === norm(cle))).length;
       const partis = [...anciens.values()].map(e => ({ ...e, parti: true }));
       c.eleves = [...eleves, ...partis];
       bilan.push({ nom: c.nom, nouvelle, eleves: eleves.length, ajoutes: nouvelle ? 0 : ajoutes, partis: partis.length, doublons: l.doublons });

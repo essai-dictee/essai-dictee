@@ -94,6 +94,7 @@ input[type=text]{flex:1}
 <div class="carte">
   <label>Trimestre <select id="trimestre"><option>T1</option><option>T2</option><option>T3</option></select></label>
   <div class="ligne"><button id="importer">Importer le fichier du trimestre</button><input type="file" id="fichier" accept=".xlsx,.xls,.ods" hidden></div>
+  <div class="ligne petit" style="margin-top:8px"><span id="colonneActuelle"></span><button id="changerColonne" style="display:none">Changer de colonne</button></div>
   <div id="choixColonne" style="display:none;margin-top:10px">
     <div class="petit">Touche la colonne prénom + initiale :</div>
     <div class="choix" id="colonnes" style="margin-top:6px"></div>
@@ -189,6 +190,8 @@ function afficher() {
     <td class="n">${ev && ev.notes[e.cle] !== undefined ? esc(M.formater(ev.notes[e.cle])) : "—"}</td>
     <td style="text-align:right;white-space:nowrap">${e.parti ? "" : `<button data-app="${i}">Apprendre</button>${e.alias.length ? ` <button data-oubli="${i}" aria-label="Oublier">✕</button>` : ""}`}</td></tr>`).join("");
   $("trimestre").value = etat.trimestre;
+  $("colonneActuelle").textContent = etat.colonne ? `Colonne des élèves : « ${etat.colonne} »` : "";
+  $("changerColonne").style.display = etat.colonne ? "" : "none";
   majRec();
 }
 
@@ -209,17 +212,19 @@ function voixFr() {
   const v = speechSynthesis.getVoices().filter(x => /^fr/i.test(x.lang));
   return v.find(x => /fr[-_]FR/i.test(x.lang)) || v[0] || null;
 }
-function parler(texte, force) {
-  if ((!voix && !force) || !("speechSynthesis" in window)) return;
+function parler(texte, force, apres) {
+  let fini = false;
+  const fin = () => { if (!fini) { fini = true; if (apres) apres(); } };
+  if ((!voix && !force) || !("speechSynthesis" in window)) return fin();
   muet = true;
   clearTimeout(securite);
   // Filet : le micro se rouvre même si Chrome ne signale jamais la fin de la phrase.
-  securite = setTimeout(() => { muet = false; }, Math.max(4000, texte.length * 110));
+  securite = setTimeout(() => { muet = false; fin(); }, Math.max(4000, texte.length * 110));
   const u = new SpeechSynthesisUtterance(texte);
   u.lang = "fr-FR";
   const v = voixFr(); if (v) u.voice = v;
-  u.onend = () => { clearTimeout(securite); setTimeout(() => { muet = false; }, 250); };
-  u.onerror = e => { clearTimeout(securite); muet = false; if (e.error !== "interrupted" && e.error !== "canceled") journal("", `<span class="non">Voix : erreur « ${esc(e.error)} » en disant « ${esc(texte)} »</span>`, null); };
+  u.onend = () => { clearTimeout(securite); setTimeout(() => { muet = false; fin(); }, 250); };
+  u.onerror = e => { clearTimeout(securite); muet = false; fin(); if (e.error !== "interrupted" && e.error !== "canceled") journal("", `<span class="non">Voix : erreur « ${esc(e.error)} » en disant « ${esc(texte)} »</span>`, null); };
   const lancer = () => { speechSynthesis.resume(); speechSynthesis.speak(u); };
   if (speechSynthesis.speaking || speechSynthesis.pending) { speechSynthesis.cancel(); setTimeout(lancer, 80); } else lancer();
 }
@@ -274,7 +279,11 @@ function recevoir(t, lat) {
   if (attente) { clearTimeout(attente.minuterie); t = attente.texte + " " + t; attente = null; }
   const c = classe(), ev = evaluation();
   const actions = M.analyser(t, { prep: c ? M.preparerEleves(elevesActifs(c)) : [], bareme: ev ? ev.bareme : null, classes: etat.classes.map(x => x.nom) });
-  for (const a of actions) {
+  // Même élève plusieurs fois dans la phrase (« Durand dix… Durand neuf et demi ») : seule la dernière note compte.
+  const derniere = new Map();
+  actions.forEach((a, k) => { if (a.type === "note") derniere.set(a.cle, k); });
+  for (const [k, a] of actions.entries()) {
+    if (a.type === "note" && derniere.get(a.cle) !== k) { journal(t, `<span class="petit">${esc(a.cle)} : ${esc(M.formater(a.valeur))} remplacé dans la même phrase</span>`, lat); continue; }
     if (mode === "pause" && !(a.type === "commande" && a.nom === "reprends")) continue;
     if (a.suite && a === actions[actions.length - 1]) {
       const suite = a.suite;
@@ -283,19 +292,38 @@ function recevoir(t, lat) {
     }
     if (a.type === "note") noter(a.cle, a.valeur, t, lat);
     else if (a.type === "commande") commande(a, t, lat);
-    else journal(t, `<span class="non">Ignoré : ${esc(a.raison)}</span>`, lat);
+    else { journal(t, `<span class="non">Ignoré : ${esc(a.raison)}</span>`, lat); direRefus(a.raison); }
   }
   afficher();
 }
 
+const REFUS_DITS = {
+  "aucune évaluation choisie": "Pas d'évaluation choisie.",
+  "au-dessus du barème": "Au-dessus du barème.",
+  "plusieurs élèves portent ce prénom : précise l'initiale": "Deux élèves portent ce prénom, précise l'initiale.",
+  "décimale non autorisée (quarts de point seulement)": "Seulement des quarts de point."
+};
+let dernierRefus = { texte: "", t: 0 };
+function direRefus(raison) {
+  const phrase = REFUS_DITS[raison];
+  if (!phrase) return;
+  // Pas deux fois la même phrase en moins de 8 s.
+  if (dernierRefus.texte === phrase && performance.now() - dernierRefus.t < 8000) return;
+  dernierRefus = { texte: phrase, t: performance.now() };
+  parler(phrase);
+}
 function noter(cle, valeur, t, lat) {
   const c = classe(), ev = evaluation();
   const avant = ev.notes[cle];
   if (avant !== undefined && avant !== valeur) {
     clearTimeout(enAttenteRemplace?.minuterie);
-    enAttenteRemplace = { cle, valeur, ev, minuterie: setTimeout(() => { enAttenteRemplace = null; }, 5000) };
+    const attenteR = { cle, valeur, ev, minuterie: null };
+    enAttenteRemplace = attenteR;
     journal(t, `<span class="non">${esc(cle)} a déjà ${esc(M.formater(avant))} : dis « remplace » pour mettre ${esc(M.formater(valeur))}</span>`, lat);
-    parler(`${nomVoix(cle)} a déjà ${M.pourVoix(avant)}. Dis remplace.`);
+    // Les 8 secondes comptent à partir de la fin de la phrase du téléphone.
+    parler(`${nomVoix(cle)} a déjà ${M.pourVoix(avant)}. Dis remplace.`, false, () => {
+      if (enAttenteRemplace === attenteR) attenteR.minuterie = setTimeout(() => { if (enAttenteRemplace === attenteR) enAttenteRemplace = null; }, 8000);
+    });
     return;
   }
   appliquer(ev, cle, valeur);
@@ -303,6 +331,7 @@ function noter(cle, valeur, t, lat) {
   parler(`${nomVoix(cle)}, ${M.pourVoix(valeur)}`);
 }
 function appliquer(ev, cle, valeur) {
+  if (enAttenteRemplace && enAttenteRemplace.cle === cle) { clearTimeout(enAttenteRemplace.minuterie); enAttenteRemplace = null; }
   historique.push({ ev, cle, avant: ev.notes[cle] });
   ev.notes[cle] = valeur;
   etat.modifie = true;
@@ -403,6 +432,7 @@ function dialogue(t) {
     const b = M.lireBareme(t);
     if (b == null) { journal(t, `<span class="non">Barème non compris</span>`, null); return parler("Je n'ai pas compris. Sur combien ?", true); }
     dlg.bareme = b; dlg.etape = "coef";
+    journal(t, `<span class="ok">Barème : sur ${b}</span>`, null);
     bandeau(`« ${dlg.desc} » · sur ${b} · coefficient ?`);
     return parler("Coefficient ?", true);
   }
@@ -410,6 +440,7 @@ function dialogue(t) {
     const k = M.lireCoef(t);
     if (k == null) { journal(t, `<span class="non">Coefficient non compris</span>`, null); return parler("Je n'ai pas compris. Coefficient ?", true); }
     dlg.coef = k; dlg.etape = "valider";
+    journal(t, `<span class="ok">Coefficient : ${esc(M.formater(k))}</span>`, null);
     bandeau(`« ${dlg.desc} » · sur ${dlg.bareme} · coef ${M.formater(k)} · je valide ?`);
     return parler(`${dlg.desc}, sur ${dlg.bareme}, coefficient ${coefVoix(k)}. Je valide ?`, true);
   }
@@ -513,7 +544,7 @@ $("fichier").addEventListener("change", async () => {
     classeurImporte = XLSX.read(await f.arrayBuffer());
   } catch (e) { $("bilan").textContent = "Fichier illisible."; return; }
   const { titres } = D.titresColonnes(classeurImporte);
-  if (etat.colonne && titres.some(x => x.toLowerCase() === etat.colonne.toLowerCase())) return importerAvec(etat.colonne);
+  if (etat.colonne && !changerCol && titres.some(x => x.toLowerCase() === etat.colonne.toLowerCase())) return importerAvec(etat.colonne);
   $("colonnes").innerHTML = titres.map((x, i) => `<button data-col="${i}">${esc(x)}</button>`).join("") || `<span class="petit">Aucun titre de colonne trouvé dans la première feuille.</span>`;
   $("colonnes").dataset.titres = JSON.stringify(titres);
   $("choixColonne").style.display = "block";
@@ -523,17 +554,25 @@ $("colonnes").addEventListener("click", ev => {
   const b = ev.target.closest("button"); if (!b) return;
   importerAvec(JSON.parse($("colonnes").dataset.titres)[+b.dataset.col]);
 });
+let changerCol = false;
+$("changerColonne").addEventListener("click", () => {
+  changerCol = true;
+  $("bilan").textContent = "Choisis le fichier, puis touche la bonne colonne. Les listes d'élèves seront remplacées.";
+  $("fichier").click();
+});
 function importerAvec(titre) {
   $("choixColonne").style.display = "none";
+  const remplacer = !!etat.colonne && etat.colonne.toLowerCase() !== titre.toLowerCase();
+  changerCol = false;
   const { listes, ignorees } = D.extraireListes(classeurImporte, titre);
   classeurImporte = null;
   if (!listes.length) { $("bilan").textContent = `Aucune feuille ne contient la colonne « ${titre} ».`; return; }
   etat.colonne = titre;
-  const bilan = D.fusionner(etat, listes, $("trimestre").value);
+  const bilan = D.fusionner(etat, listes, $("trimestre").value, remplacer);
   sauver(); afficher();
   const txt = bilan.map(b => `${b.nom} : ${b.eleves} élèves${b.nouvelle ? "" : `${b.ajoutes ? `, ${b.ajoutes} nouveau(x)` : ""}${b.partis ? `, ${b.partis} plus dans la liste` : ""}`}${b.doublons.length ? ` (en double, ignoré : ${b.doublons.join(", ")})` : ""}`);
   if (ignorees.length) txt.push(`Feuilles ignorées (pas de colonne « ${titre} ») : ${ignorees.join(", ")}`);
-  $("bilan").innerHTML = `Import fait (colonne « ${esc(titre)} »). ${txt.map(esc).join(" · ")}<br>Tu peux supprimer le fichier reçu si tu n'en as plus besoin.`;
+  $("bilan").innerHTML = `Import fait (colonne « ${esc(titre)} »)${remplacer ? ", listes remplacées : les notes saisies avec l'ancienne colonne ne sont plus rattachées à un élève" : ""}. ${txt.map(esc).join(" · ")}<br>Tu peux supprimer le fichier reçu si tu n'en as plus besoin.`;
   journal("", `<span class="ok">Import : ${listes.length} classe(s)</span>`, null);
 }
 $("trimestre").addEventListener("change", () => { etat.trimestre = $("trimestre").value; sauver(); });
@@ -604,7 +643,7 @@ $("evals").addEventListener("click", ev => {
 });
 $("nouvelleEval").addEventListener("click", () => {
   const c = classe(); if (!c) return;
-  if (mode === "ecoute") return debutDialogue();
+  if (mode === "ecoute") { journal("", `<span class="ok">Nouvelle évaluation (bouton)</span>`, null); return debutDialogue(); }
   creerEval(c, `Évaluation ${c.evals.length + 1}`, 20, 1); afficher();
 });
 $("evDesc").addEventListener("change", () => { const ev = evaluation(); if (ev && $("evDesc").value.trim()) { ev.desc = $("evDesc").value.trim(); etat.modifie = true; sauver(); afficher(); } });
